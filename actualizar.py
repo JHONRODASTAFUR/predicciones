@@ -23,7 +23,50 @@ from motor import alineaciones, apuestas, cuotas_hist, jugadores  # noqa: E402
 from motor import mercados_extra as mx  # noqa: E402
 from motor import config as C  # noqa: E402
 from motor import datos, geo, modelo  # noqa: E402
-from motor import conjunto  # noqa: E402
+from motor import conjunto, noticias  # noqa: E402
+
+
+def agregar_noticias(item, e, env, al, pred, P):
+    """Noticias del partido, posibles bajas en el once probable y escenario «sin las posibles bajas»."""
+    nots = env.get("noticias") or {}
+    reciente = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=noticias.DIAS)).isoformat()
+    por_lado = {lado: [x for x in (nots.get(e[lado]["id"]) or {}).get("items", []) if (x.get("fecha") or "") >= reciente][:6]
+                for lado in ("h", "a")}
+    if por_lado["h"] or por_lado["a"]:
+        item["noticias"] = por_lado
+    if not al or not (por_lado["h"] or por_lado["a"]):
+        return
+    fuera = {}
+    for lado in ("h", "a"):
+        pb = noticias.posibles_bajas(por_lado[lado], al[lado]["jugadores"])
+        for r in al[lado]["jugadores"]:
+            if r["id"] in pb:
+                r["posible_baja"] = pb[r["id"]]
+        fuera[lado] = set(pb)
+    jug = env.get("jug")
+    if al["estado"] != "probable" or not jug or not (fuera["h"] or fuera["a"]):
+        return
+    J, beta = jug["J"], jug["cfg"].get("beta", 0.0)
+    d, nombres = {}, {"fuera": {}, "entran": {}}
+    for lado in ("h", "a"):
+        tid = e[lado]["id"]
+        if fuera[lado]:
+            once, reemp = J.once_sin(tid, fuera[lado])
+            d[lado] = J.delta(tid, once)
+            nombres["fuera"][lado] = [J.info.get(j, {}).get("n") for j in fuera[lado]]
+            nombres["entran"][lado] = [J.info.get(j, {}).get("n") for j in reemp]
+        else:
+            d[lado] = (0.0, 0.0)
+    tope = jugadores.TOPE_AJUSTE
+    fh = math.exp(max(-tope, min(tope, beta * (d["h"][0] + d["a"][1]))))
+    fa = math.exp(max(-tope, min(tope, beta * (d["a"][0] + d["h"][1]))))
+    lh, la = pred["lh"] * fh, pred["la"] * fa
+    M = modelo.matriz(np.array([lh]), np.array([la]), P.rho)[0]
+    pH, pD, pA, _, _ = modelo.resumen_matriz(M[None])
+    al["escenario_bajas"] = {**nombres, "beta": beta, "factor_local": round(fh, 4), "factor_visita": round(fa, 4),
+                             "lh": round(lh, 3), "la": round(la, 3), "pH": round(float(pH[0]), 4),
+                             "pD": round(float(pD[0]), 4), "pA": round(float(pA[0]), 4),
+                             "matriz": [[round(float(v), 6) for v in fila] for fila in M]}
 
 
 def con_conjunto(D, P, jugados):
@@ -546,6 +589,11 @@ def construir_item(e, env):
         "pred": pred, "disciplina": env["disc"].predecir(D, e, rng), "mercado": mer, "clima": cl, "ctx": ctx,
         "alineacion": al,
     }
+    if e["estado"] == "pre":
+        try:
+            agregar_noticias(item, e, env, al, pred, P)
+        except Exception:
+            log.warning("Sin noticias para %s: %s", e["id"], traceback.format_exc(limit=2))
     if e["estado"] == "pre" and mats:
         # matriz de marcadores para la simulación del partido en la app (todos los partidos)
         item["matriz"] = [[round(float(v), 6) for v in fila] for fila in mats[0]]
@@ -628,7 +676,8 @@ def ejecutar_rapido():
            "bt": bt, "config_valor": {"habilitado": bool(bt.get("valor_habilitado")),
                                       "peso_modelo": bt.get("peso_modelo", 0.0)},
            "val_ligas": (ajuste.get("validacion") or {}).get("por_liga", {}), "confirmadas": conf,
-           "jug": preparar_jugadores(D, P, ajuste, None, False), "extras": preparar_extras(D, vida, ajuste)}
+           "jug": preparar_jugadores(D, P, ajuste, None, False), "extras": preparar_extras(D, vida, ajuste),
+           "noticias": noticias.cargar()}
     nuevos = []
     for e in D.eventos:
         if e["id"] in conf:
@@ -790,11 +839,20 @@ def ejecutar(forzar=False):
     except Exception:
         log.warning("Sin córners/tarjetas/tiempos: %s", traceback.format_exc(limit=3))
 
+    estado(fase="Buscando noticias y bajas (Google Noticias)", progreso=92)
+    try:
+        nots, n_nuevas, n_busq = noticias.sincronizar(
+            proximos, prioridad=lambda e: C.INFO_LIGA.get(e["lg"], {}).get("nivel", 4))
+        log.info("Noticias: %d equipos actualizados de %d buscados", n_nuevas, n_busq)
+    except Exception:
+        log.warning("Sin noticias: %s", traceback.format_exc(limit=2))
+        nots = noticias.cargar()
+
     estado(fase="Calculando predicciones", progreso=93)
     hist = leer_historial()
     env = {"P": P, "D": D, "rng": rng, "disc": disc, "tablas": tablas, "lugares": lugares, "por_equipo": por_equipo,
            "clima": clima, "hist": hist, "bt": bt, "config_valor": config_valor, "val_ligas": val_ligas,
-           "confirmadas": confirmadas, "jug": jug, "extras": extras}
+           "confirmadas": confirmadas, "jug": jug, "extras": extras, "noticias": nots}
     salida = []
     for e in mostrar:
         try:

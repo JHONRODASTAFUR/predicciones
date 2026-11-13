@@ -148,6 +148,15 @@ label.interruptor { display: inline-flex; align-items: center; gap: 7px; color: 
 .apuesta-linea .txt { color: var(--texto); font-weight: 700; }
 .apuesta-linea .cm { margin-left: auto; }
 .apuesta-linea .cm b { color: var(--texto); }
+.dos-noticias { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dos-noticias .tit img { width: 18px; height: 18px; vertical-align: -4px; margin-right: 6px; }
+ul.noticias { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+ul.noticias a { color: var(--texto); text-decoration: none; }
+ul.noticias a:hover { text-decoration: underline; }
+.not-tag, .baja-tag { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .3px; padding: 1px 6px; border-radius: 4px; margin-right: 4px; background: var(--borde); color: var(--texto); white-space: nowrap; }
+.not-tag.lesion, .not-tag.sancion, .baja-tag { background: #3a1419; color: #fb7185; text-decoration: none; }
+.not-tag.duda { background: #3a3014; color: var(--amarillo); }
+@media (max-width: 600px) { .dos-noticias { grid-template-columns: 1fr; } }
 .acceso { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--fondo, #0a0f1c); padding: 16px; }
 .acceso-caja { width: min(380px, 100%); display: grid; gap: 12px; padding: 22px; border: 1px solid var(--borde); border-radius: 12px; background: var(--panel, #111827); }
 .acceso-caja input[type=password] { padding: 10px 12px; border-radius: 8px; border: 1px solid var(--borde); background: transparent; color: var(--texto); font-size: 16px; }

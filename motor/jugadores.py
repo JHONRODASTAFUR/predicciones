@@ -62,13 +62,34 @@ class Jugadores:
     def dfn(self, j):
         return self.def_num[j] / (self.def_den[j] + self.K)
 
-    def habitual(self, equipo, n=8):
-        """Once habitual: los 11 con más minutos en los últimos n partidos del equipo."""
+    def ranking(self, equipo, n=8):
+        """Jugadores del equipo ordenados por minutos en sus últimos n partidos."""
         mins = defaultdict(float)
         for p in self.ultimos[equipo][-n:]:
             for j, m in p.items():
                 mins[j] += m
-        return [j for j, _ in sorted(mins.items(), key=lambda x: -x[1])[:11]]
+        return [j for j, _ in sorted(mins.items(), key=lambda x: -x[1])]
+
+    def habitual(self, equipo, n=8):
+        """Once habitual: los 11 con más minutos en los últimos n partidos del equipo."""
+        return self.ranking(equipo, n)[:11]
+
+    def once_sin(self, equipo, fuera):
+        """Once habitual sin los jugadores `fuera`: cada uno se reemplaza por el siguiente con más minutos de su
+        misma línea (o de cualquiera si no hay). Devuelve (once, reemplazos)."""
+        rk = self.ranking(equipo)
+        once = [j for j in rk[:11] if j not in fuera]
+        reemplazos = []
+        for j in rk[:11]:
+            if j not in fuera:
+                continue
+            ln = self.info.get(j, {}).get("linea")
+            libres = [c for c in rk[11:] if c not in fuera and c not in once]
+            c = next((c for c in libres if self.info.get(c, {}).get("linea") == ln), libres[0] if libres else None)
+            if c:
+                once.append(c)
+                reemplazos.append(c)
+        return once, reemplazos
 
     def delta(self, equipo, once):
         hab = self.habitual(equipo)

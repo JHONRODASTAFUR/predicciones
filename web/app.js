@@ -373,6 +373,8 @@ function abrirDetalle(id) {
   if (m.extras) conectarExtras(m);
   const bs = $("#btn-simular");
   if (bs) bs.onclick = () => pintarSimulacion(m);
+  const bb = $("#btn-sim-bajas");
+  if (bb) bb.onclick = () => pintarSimulacion(m, m.alineacion.escenario_bajas);
   $("#det-copiar").onclick = () => copiarPrompt(m);
   $("#det-guardar").onclick = () => guardarPrompt(m);
   if ($("#det-pdf")) $("#det-pdf").onclick = () => api("/api/abrir_pdf", { method: "POST" })
@@ -464,7 +466,7 @@ const signoPct = x => x == null ? "–" : `${x >= 0 ? "+" : ""}${num(x * 100, 1)
 function htmlOnce(m, lado) {
   const al = m.alineacion, x = al[lado], eq = m[lado];
   const filas = x.jugadores.map(j => `<tr><td><span class="linea-tag">${j.linea}</span> <span class="pos">${esc(j.pos)}</span></td>
-    <td>${esc(j.n)}</td>
+    <td>${esc(j.n)}${j.posible_baja ? ` <a class="baja-tag" href="${esc(j.posible_baja.link)}" target="_blank" rel="noopener noreferrer" title="${esc(j.posible_baja.titulo)} (${esc(j.posible_baja.fuente)})">posible baja · ${esc(TIPO_NOTICIA[j.posible_baja.tipo] || j.posible_baja.tipo)}</a>` : ""}</td>
     <td class="num ${j.ataque > 0 ? "mas" : j.ataque < 0 ? "menos" : ""}" title="Goles de su equipo por encima de lo esperado cuando juega (contraído hacia 0)">${signoPct(j.ataque)}</td>
     <td class="num ${j.defensa < 0 ? "mas" : j.defensa > 0 ? "menos" : ""}" title="Goles recibidos por encima de lo esperado cuando juega (negativo = mejor)">${signoPct(j.defensa)}</td>
     <td class="num">${j.g90 == null ? "–" : num(j.g90, 2)}</td><td class="num">${j.prob_gol == null ? "–" : pct(j.prob_gol)}</td></tr>`).join("");
@@ -535,6 +537,30 @@ function htmlAlineacion(m) {
     </div>`;
 }
 
+// ---------------------------------------------------------------- noticias (Google Noticias)
+const TIPO_NOTICIA = { lesion: "lesión", sancion: "sanción", duda: "duda / baja", dt: "entrenador", convocatoria: "convocatoria" };
+
+function htmlNoticias(m) {
+  const n = m.noticias;
+  if (!n || m.estado !== "pre") return "";
+  const lista = lado => (n[lado] || []).map(x => `<li><span class="not-tag ${esc(x.tipo)}">${esc(TIPO_NOTICIA[x.tipo] || x.tipo)}</span>
+      <a href="${esc(x.link)}" target="_blank" rel="noopener noreferrer">${esc(x.titulo)}</a>
+      <span class="nota">· ${esc(x.fuente)}${x.fecha ? ` · ${haceCuanto(x.fecha)}` : ""}</span></li>`).join("") || `<li class="nota">Sin noticias de bajas en los últimos días.</li>`;
+  const esc_ = m.alineacion?.escenario_bajas;
+  const escenario = esc_ ? `<div class="caja" style="margin-top:10px"><div class="tit">Escenario sin las posibles bajas</div>
+      <p class="nota">Sin ${esc([...(esc_.fuera.h || []), ...(esc_.fuera.a || [])].join(", "))}${[...(esc_.entran.h || []), ...(esc_.entran.a || [])].length ? `; entrarían ${esc([...(esc_.entran.h || []), ...(esc_.entran.a || [])].join(", "))}` : ""} (el siguiente con más minutos de su misma línea).</p>
+      <div class="tres"><div class="caja l"><div class="tit">${esc(m.h.n)}</div><div class="grande">${pct(esc_.pH, 1)}</div><div class="nota">ahora ${pct(m.pred.pH, 1)}</div></div>
+        <div class="caja x"><div class="tit">Empate</div><div class="grande">${pct(esc_.pD, 1)}</div><div class="nota">ahora ${pct(m.pred.pD, 1)}</div></div>
+        <div class="caja v"><div class="tit">${esc(m.a.n)}</div><div class="grande">${pct(esc_.pA, 1)}</div><div class="nota">ahora ${pct(m.pred.pA, 1)}</div></div></div>
+      <p class="nota">Usa el aporte medido de cada jugador con el mismo ajuste validado de las alineaciones (×${num(esc_.factor_local, 3)} local, ×${num(esc_.factor_visita, 3)} visita). Es hipotético: la noticia puede ser falsa o de otra competición, por eso NO cambia la predicción principal.</p>
+      <div class="acciones"><button class="boton" id="btn-sim-bajas">Simular este escenario</button></div></div>` : "";
+  return `<div class="seccion"><h3>Noticias y bajas <small>Google Noticias · últimos 5 días · se revisa cada 3 horas</small></h3>
+    <div class="dos-noticias"><div class="caja"><div class="tit">${logo(m.h.logo)}${esc(m.h.n)}</div><ul class="noticias">${lista("h")}</ul></div>
+    <div class="caja"><div class="tit">${logo(m.a.logo)}${esc(m.a.n)}</div><ul class="noticias">${lista("a")}</ul></div></div>
+    ${escenario}
+    <p class="nota">Titulares de Marca, AS, ESPN, Depor, Líbero, Infobae y otros medios, filtrados por palabras como lesión, baja o sancionado. Se muestran como información: no cambian solas las probabilidades (no se pueden comprobar con partidos pasados, R19). Toca un titular para leer la nota completa.</p></div>`;
+}
+
 function htmlSimulacion(m) {
   const M = m.alineacion?.matriz || m.matriz;
   if (!M || m.estado !== "pre") return "";
@@ -569,8 +595,12 @@ function simularConteos(c, n) {
   return { media, mas: x => p(t => t > x), local: dif.filter(d => d > 0).length / n, igual: dif.filter(d => d === 0).length / n, visita: dif.filter(d => d < 0).length / n };
 }
 
-function simular(m, n = 10000) {
-  const al = m.alineacion || { goleadores: [], lh: m.pred.lh, la: m.pred.la }, M = m.alineacion?.matriz || m.matriz;
+function simular(m, n = 10000, esc_ = null) {
+  const al0 = m.alineacion || { goleadores: [], lh: m.pred.lh, la: m.pred.la };
+  // escenario «sin posibles bajas»: otra matriz y sin los goles de los jugadores que no estarían
+  const sinNombres = new Set(esc_ ? [...(esc_.fuera.h || []), ...(esc_.fuera.a || [])] : []);
+  const al = esc_ ? Object.assign({}, al0, { lh: esc_.lh, la: esc_.la, goleadores: (al0.goleadores || []).filter(g => !sinNombres.has(g.n)) }) : al0;
+  const M = esc_ ? esc_.matriz : (m.alineacion?.matriz || m.matriz);
   const celdas = [], acum = [];
   let s = 0;
   M.forEach((fila, i) => fila.forEach((p, j) => { s += p; celdas.push([i, j]); acum.push(s); }));
@@ -606,7 +636,7 @@ function simular(m, n = 10000) {
 
 function cuotaMinimaJS(p) { return Math.ceil(Math.max(1.25, 1.04 / p, 1 / Math.max(p - 0.02, 1e-6)) * 100 - 1e-9) / 100; }
 
-function mercadosBetano(m, r) {
+function mercadosBetano(m, r, escenario = false) {
   const L = m.h.n, V = m.a.n, P = r.p;
   // [mercado, selección, prob. simulada, prob. de devolución, código del mercado validado]
   const filas = [
@@ -635,7 +665,8 @@ function mercadosBetano(m, r) {
   ];
   // para los mercados que la app ya valida se decide con SU probabilidad y SU cuota mínima (con cuotas,
   // recalibración y puerta de calibración), no con la simulación: así nunca se contradicen
-  const validados = Object.fromEntries((m.apuesta?.mercados || []).map(x => [x.cod, x]));
+  // en un escenario hipotético no se usan las probabilidades validadas (son del partido tal como está)
+  const validados = escenario ? {} : Object.fromEntries((m.apuesta?.mercados || []).map(x => [x.cod, x]));
   return filas.map(([mer, sel, psim, dev, cod]) => {
     const v = cod && validados[cod];
     return v ? { mer, sel, psim, p: v.p, dev: v.p_dev || 0, minima: v.no_calibrado ? null : v.minima, fuente: m.apuesta.base, bloqueado: !!v.no_calibrado }
@@ -643,12 +674,13 @@ function mercadosBetano(m, r) {
   });
 }
 
-function pintarSimulacion(m) {
+function pintarSimulacion(m, esc_ = null) {
   const out = $("#sim-res"), btn = $("#btn-simular");
   btn.disabled = true; btn.textContent = "Simulando…";
+  if (esc_) out.scrollIntoView({ behavior: "smooth", block: "start" });
   setTimeout(() => {
-    const r = simular(m);
-    const filas = mercadosBetano(m, r);
+    const r = simular(m, 10000, esc_);
+    const filas = mercadosBetano(m, r, !!esc_);
     const conteo = (c, nombre, lineas) => {
       const s = simularConteos(c, r.n);
       if (!s) return "";
@@ -669,7 +701,7 @@ function pintarSimulacion(m) {
       <td class="num nota">${pct(f.psim, 1)}</td><td class="num" title="Probabilidad con la que se decide: ${f.fuente === "mercado" ? "ajustada a las cuotas del mercado" : f.fuente === "modelo" ? "modelo recalibrado" : "simulación"}">${pct(f.p, 1)}</td>
       <td class="num">${num(1 / Math.max(f.p, 1e-6))}</td><td class="num"><b>${f.minima ? num(f.minima) : "–"}</b></td>
       <td>${f.minima ? `<input type="number" step="0.01" min="1.01" data-i="${i}" placeholder="cuota">` : ""}</td><td class="nota" id="ev-${i}"></td></tr>`).join("");
-    out.innerHTML = `<div class="tres">
+    out.innerHTML = (esc_ ? `<div class="senal amarillo"><b>Escenario hipotético:</b> sin ${esc([...(esc_.fuera.h || []), ...(esc_.fuera.a || [])].join(", "))}${[...(esc_.entran.h || []), ...(esc_.entran.a || [])].length ? ` (entrarían ${esc([...(esc_.entran.h || []), ...(esc_.entran.a || [])].join(", "))})` : ""}. Es una simulación con lo que dicen las noticias, no una predicción comprobada: la tabla usa solo la simulación. Pulsa «Simular 10 000 partidos» para volver al partido normal.</div>` : "") + `<div class="tres">
         <div class="caja l"><div class="tit">Gana ${esc(m.h.n)}</div><div class="grande">${pct(r.pH, 1)}</div></div>
         <div class="caja x"><div class="tit">Empate</div><div class="grande">${pct(r.pD, 1)}</div></div>
         <div class="caja v"><div class="tit">Gana ${esc(m.a.n)}</div><div class="grande">${pct(r.pA, 1)}</div></div></div>
@@ -863,6 +895,7 @@ Conjunto (ligas de nivel 3-4; probado semana a semana, mejora el 1X2 ~1%):
       <p class="nota">Confianza <span class="conf ${m.pred.conf}">${m.pred.conf}</span>. Son probabilidades, no certezas (R17): un 60% falla 4 de cada 10 veces.</p>
     </div>
     ${htmlApuesta(m)}
+    ${htmlNoticias(m)}
     ${htmlSimulacion(m)}
     ${htmlExtras(m)}
     ${htmlAlineacion(m)}

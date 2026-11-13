@@ -45,6 +45,21 @@ Simulación del partido (TODOS los partidos por jugarse)
   victoria, goles exactos, par/impar, hándicap, marcador exacto y goleador. Escribe tu cuota y te dice
   si supera la mínima.
 
+Página web privada 24/7 (GitHub, gratis)
+  Dirección y clave: en tu escritorio, archivo "Acceso pagina predicciones.txt".
+  Los servidores de GitHub ejecutan el actualizador cada hora (y revisan alineaciones cada 15 min)
+  aunque tu laptop esté apagada, y publican la app como página. Los datos van CIFRADOS: sin la clave
+  solo se ve la pantalla que la pide. El código del programa sí es público (plan gratis de GitHub).
+  Proyecto: github.com/JHONRODASTAFUR/predicciones (pestaña "Actions" = historial de actualizaciones).
+
+Noticias y bajas (Google Noticias, gratis)
+  Cada actualización completa busca titulares de los últimos 5 días (lesión, baja, sancionado, duda,
+  convocatoria, entrenador) de los equipos que juegan en las próximas 48 h (hasta 150 equipos por vez;
+  cada equipo se revisa cada 3 h). Salen en "Noticias y bajas" de cada partido, con enlace a la nota.
+  Si un titular nombra a un titular habitual, se marca "posible baja" en el once probable y aparece el
+  "Escenario sin las posibles bajas" con su botón para simularlo. Las noticias NO cambian solas la
+  predicción principal (no se pueden comprobar con partidos pasados).
+
 Conjunto de modelos (desde el 13/11/2026, ligas de nivel 3-4 = el "resto del mundo")
   El modelo principal se combina con dos opiniones más: el mismo modelo con memoria corta (120 días,
   reacciona a la racha) y un rating Elo (se mueve partido a partido y conecta ligas por las copas).
