@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predicciones Fútbol</title>
+<link rel="icon" href="icono.png">
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+<header>
+  <div class="marca">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#e7ecf6"/><path d="M16 8.5l5.2 3.8-2 6.1h-6.4l-2-6.1z" fill="#0a0f1c"/><path d="M16 2v6.5M21.2 12.3l6.1-2.3M19.2 18.4l3.9 5.3M12.8 18.4l-3.9 5.3M10.8 12.3l-6.1-2.3" stroke="#0a0f1c" stroke-width="1.6"/></svg>
+    Predicciones Fútbol
+  </div>
+  <nav id="nav">
+    <button data-vista="partidos" class="activo">Partidos</button>
+    <button data-vista="resultados">Resultados y aciertos</button>
+    <button data-vista="tablas">Tablas</button>
+    <button data-vista="modelo">Modelo</button>
+    <button data-vista="ayuda">Cómo funciona</button>
+  </nav>
+  <div class="estado">
+    <span class="pastilla" id="pastilla"><span class="punto" id="punto"></span><span id="estado-txt">Cargando…</span>
+      <span class="barra-progreso" id="barra" hidden><div id="barra-in" style="width:0"></div></span></span>
+    <button class="boton" id="btn-actualizar" title="Descargar datos nuevos y recalcular">Actualizar ahora</button>
+  </div>
+</header>
+
+<main>
+  <div id="avisos"></div>
+
+  <section class="vista activa" id="v-partidos">
+    <div class="barra-herr">
+      <div class="chips" id="dias"></div>
+      <input class="buscar" id="buscar" type="search" placeholder="Buscar equipo…">
+      <select id="filtro-liga"></select>
+      <label class="interruptor"><input type="checkbox" id="solo-dest"> Solo destacadas</label>
+      <label class="interruptor" title="Más probable: aciertas más seguido, pero paga poco. Mayor pago: aciertas menos, pero paga más.">Apuesta:
+        <select id="perfil">
+          <option value="conservador">Más probable</option>
+          <option value="equilibrado">Recomendada</option>
+          <option value="arriesgado">Mayor pago</option>
+        </select></label>
+    </div>
+    <div id="lista"></div>
+  </section>
+
+  <section class="vista" id="v-resultados">
+    <h2>Aciertos del programa</h2>
+    <p class="nota">Cada predicción se guarda <b>antes</b> del partido y se compara con el resultado real (D24.17). Así se mide si las probabilidades están bien calibradas.</p>
+    <div class="kpis" id="kpis-hist"></div>
+    <div class="barra-herr"><select id="filtro-hist"></select></div>
+    <div id="tabla-hist"></div>
+  </section>
+
+  <section class="vista" id="v-tablas">
+    <div class="barra-herr"><select id="sel-tabla"></select></div>
+    <div id="tabla-pos"></div>
+  </section>
+
+  <section class="vista" id="v-modelo"></section>
+
+  <section class="vista ayuda" id="v-ayuda"></section>
+</main>
+
+<div class="velo" id="velo"></div>
+<aside class="detalle" id="detalle" aria-live="polite"></aside>
+<div class="toast" id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+GUÍA: TU PÁGINA DE PREDICCIONES 24/7 (GRATIS, SOLO TÚ ENTRAS)
+=============================================================
+
+CÓMO FUNCIONA (en simple)
+  - Oracle te presta GRATIS para siempre una computadora en internet (un "servidor") que nunca se apaga.
+  - Ahí se copia tu programa. Se actualiza solo cada hora (y las alineaciones cada 15 min), igual que
+    en tu laptop, pero sin que tu laptop esté prendida.
+  - La página tiene candado HTTPS. Al entrar te pide USUARIO = tu correo y una CLAVE larga que solo tú
+    tienes (se guarda en tu escritorio, en "Acceso pagina predicciones.txt"). Sin eso nadie entra.
+  - Funciona desde el celular o cualquier computadora.
+
+PASO 1 · Crear la cuenta gratis de Oracle (lo haces tú, ~15 min)
+  1. Entra a  https://www.oracle.com/cloud/free/  → "Start for free" / "Comenzar gratis".
+  2. Usa tu correo, país Perú, y verifica el correo.
+  3. "Home Region": elige  Brazil East (Sao Paulo)  o  Chile Central (Santiago). No se puede cambiar
+     después.
+  4. Te pedirá una tarjeta SOLO para verificar que eres una persona (puede hacer un cobro de prueba
+     de ~1 dólar que se devuelve). Esto lo escribes tú; Claude no puede ni debe hacerlo.
+     Mientras uses solo lo "Always Free" no se cobra nada. NO hagas "Upgrade to Pay As You Go".
+  5. Espera el correo de "tu cuenta está lista" (a veces tarda unos minutos).
+
+PASO 2 · Crear el servidor (lo haces tú, ~10 min)
+  1. En la consola de Oracle: menú ☰ → Compute → Instances → "Create instance".
+  2. Name: predicciones
+  3. Image and shape → "Edit":
+       - Image → "Change image" → Canonical Ubuntu → versión 24.04 (NO la "Minimal", NO 22.04).
+       - Shape → "Change shape" → Ampere → VM.Standard.A1.Flex → 1 OCPU y 6 GB de memoria.
+         Debe decir "Always Free-eligible".
+         Si sale "Out of capacity": prueba otro "Availability domain" o vuelve a intentar más tarde.
+         Si sigue sin salir: Specialty and previous generation → VM.Standard.E2.1.Micro (también
+         gratis; más lenta, pero el programa ya está preparado para ella).
+  4. Networking: deja "Create new virtual cloud network" y "Assign a public IPv4 address" = Sí.
+  5. Add SSH keys → "Generate a key pair for me" → botón "Download private key".
+     Se baja un archivo tipo  ssh-key-2026-11-13.key  a Descargas. ¡No lo pierdas ni lo compartas!
+  6. "Create". Espera a que diga RUNNING (verde) y copia la "Public IP address" (ej. 129.151.10.20).
+
+PASO 3 · Abrir la puerta de la página (lo haces tú, ~3 min)
+  1. En la página de tu instancia, haz clic en el nombre de la "Subnet" (o: menú ☰ → Networking →
+     Virtual cloud networks → tu red → Security / Security Lists → Default Security List).
+  2. "Add Ingress Rules":
+       Source CIDR: 0.0.0.0/0     IP Protocol: TCP     Destination Port Range: 80,443
+     → "Add Ingress Rules".
+  (Esto solo abre la puerta; la clave sigue siendo obligatoria para ver la página.)
+
+PASO 4 · Subir el programa (lo hace Claude, o tú con un comando)
+  Pásale a Claude: la IP pública y el nombre del archivo .key. Claude ejecuta:
+     cd C:\Users\MSI-KATANA\PrediccionesFutbol\servidor
+     powershell -ExecutionPolicy Bypass -File .\subir.ps1 -IP TU_IP -Llave "C:\Users\MSI-KATANA\Downloads\ssh-key-....key" -Correo tu@correo.com
+  Tarda ~10-15 min la primera vez (sube ~110 MB e instala todo). Al final crea en tu escritorio
+  "Acceso pagina predicciones.txt" con la dirección, tu usuario (correo) y la clave.
+
+PASO 5 · Probar
+  Abre en el celular la dirección del archivo (https://TU-IP-CON-GUIONES.sslip.io).
+  Te pedirá usuario (tu correo) y clave → entras a tu app, igual que en la laptop.
+  Consejo: guarda la clave en el celular (el navegador te lo ofrece) y agrega la página a la
+  pantalla de inicio.
+
+DESPUÉS
+  - Cuando Claude cambie el programa, vuelve a correr el paso 4 (sube solo el código, no borra datos).
+  - Si la página funciona bien unos días, puedes apagar las tareas de la laptop (cuidas tu laptop).
+  - ¿Clave perdida? Borra "Acceso pagina predicciones.txt" del escritorio y repite el paso 4: crea
+    una clave nueva.

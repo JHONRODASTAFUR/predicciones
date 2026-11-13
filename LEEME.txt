@@ -1,0 +1,83 @@
+PREDICCIONES FÚTBOL
+===================
+
+Abrir:        doble clic en "Predicciones Fútbol" (escritorio o menú Inicio).
+Se actualiza: solo, con la tarea de Windows "PrediccionesFutbol":
+              cada hora, al encender la laptop y al conectarse a internet.
+              Si no hay internet, muestra lo último guardado y avisa.
+No necesita:  a Claude, cuentas ni claves.
+
+Fuentes (gratuitas, sin cuenta)
+  - ESPN (site.api.espn.com): resultados, calendario, tablas, tarjetas, penales y cuotas.
+  - Open-Meteo (open-meteo.com): altitud de las ciudades y clima del partido.
+  - football-data.co.uk: cuotas históricas de cierre, solo para probar las apuestas (una vez al día).
+
+Qué calcula (Prompt Maestro, D24)
+  Probabilidades 1X2 con intervalo del 80%, goles esperados, más/menos de 1,5/2,5/3,5,
+  ambos marcan, 5 marcadores más probables, tarjetas, gol de penal, expulsión,
+  comparación con el mercado y validación con partidos pasados (Brier, log-loss, RPS).
+  Botón "Copiar prompt aplicado": tu Prompt Maestro con la tabla de la sección 0 ya
+  completada para ese partido, listo para pegar en Claude.
+
+Apuesta recomendada (en cada partido no iniciado)
+  Elige el tipo arriba en la lista: Más probable (75-88%), Recomendada (55-75%) o Mayor pago (35-55%).
+  Cada apuesta trae probabilidad con rango, cuota justa y CUOTA MÍNIMA: si tu casa paga menos, no apuestes.
+  En el detalle, la calculadora te dice si conviene y cuánto apostar (máximo 0,5% de tu banca).
+  Se liquida con el marcador a los 90' y queda registrada antes del inicio (pestaña "Resultados y aciertos").
+  Prueba con cuotas reales de cierre (football-data.co.uk): las probabilidades están bien calibradas,
+  pero NO hay ganancia demostrada frente a la casa. La etiqueta "apuesta de valor" está apagada y se
+  vuelve a comprobar cada día. Solo mayores de 18, en casas autorizadas por el MINCETUR.
+  ¿Te causa estrés o deudas? Línea 113, opción 5 (salud mental, MINSA).
+
+Alineaciones (todas las ligas; con más historia en las grandes, Libertadores, Sudamericana y Liga 1)
+  Once probable (el habitual) y, ~1 h antes, el confirmado: la tarea "PrediccionesFutbolAlineaciones"
+  revisa cada 15 min los partidos de las próximas 2,5 horas. Aporte de cada jugador, cambios frente al
+  once habitual, línea contra línea, estilo de juego, rivales parecidos, local/visita y enfrentamientos
+  previos. El ajuste por alineación está activo con efecto pequeño (tope ±25%), porque la prueba mostró
+  una mejora pequeña. Las ligas chicas van llenando su historia de jugadores poco a poco (1500 partidos
+  por actualización), así que al principio muchas no tendrán alineación.
+
+Simulación del partido (TODOS los partidos por jugarse)
+  Botón "Simular 10 000 partidos": juega el partido 10 000 veces con los goles esperados del modelo
+  (y de la alineación si la hay), reparte goles entre jugadores si hay datos, y simula córners y
+  tarjetas. Lo traduce a mercados de Betano: 1X2, doble oportunidad, sin empate, goles, ambos marcan,
+  resultado + ambos marcan, resultado + más/menos 2,5, portería a cero, ganar sin recibir, margen de
+  victoria, goles exactos, par/impar, hándicap, marcador exacto y goleador. Escribe tu cuota y te dice
+  si supera la mínima.
+
+Conjunto de modelos (desde el 13/11/2026, ligas de nivel 3-4 = el "resto del mundo")
+  El modelo principal se combina con dos opiniones más: el mismo modelo con memoria corta (120 días,
+  reacciona a la racha) y un rating Elo (se mueve partido a partido y conecta ligas por las copas).
+  El total de goles sigue saliendo del modelo principal; la mezcla solo reparte local/visita.
+  Prueba semana a semana sin mirar el futuro (26 semanas, 11 597 partidos): RPS 0,2145 → 0,2123,
+  log-loss 1,0232 → 1,0118. En ligas grandes no mejoraba, por eso allí no se aplica.
+  Se probaron y DESCARTARON (no mejoraban): remates/remates al arco, solo recalibrar, y cuotas pasadas
+  de cada equipo. En "Ver cálculo" de cada partido sale la mezcla con sus pesos.
+
+Las 3 apuestas juntas
+  Cada partido muestra a la vez la apuesta de los 3 perfiles: Más probable (la más segura),
+  Recomendada y Mayor pago (paga más, falla más). La de tu perfil va resaltada; el detalle y la
+  calculadora son de ese perfil (cámbialo en el selector "Apuesta").
+
+Más mercados (58 de goles + medio tiempo/final y 1.er/2.º tiempo combinados)
+  Todos aparecen en "Ver todas las opciones" de la apuesta. Solo tienen cuota mínima los que pasaron
+  la prueba con partidos pasados; los demás dicen "no pasó la prueba".
+
+Córners, tarjetas y tiempos (todas las ligas de ESPN, ~200 competiciones)
+  Córners totales y por equipo, tarjetas (amarillas + rojas) con efecto del árbitro (solo Inglaterra y
+  Escocia: es el único dato gratuito), primer y segundo tiempo. Cada opción se prueba con partidos pasados:
+  solo las que acertaron lo que prometían tienen cuota mínima; las demás dicen "no pasó la prueba".
+
+Archivos
+  datos\predicciones.json   lo que muestra la app
+  datos\historial.json      cada predicción guardada antes del partido y su resultado
+  logs\                     registro de cada actualización (por si algo falla)
+
+Comandos útiles (PowerShell, dentro de esta carpeta)
+  python actualizar.py            actualizar a mano mostrando el avance
+  python actualizar.py --forzar   además recalcula la validación del modelo
+  .\instalar.ps1                  volver a crear accesos directos y tarea
+  .\desinstalar.ps1               quitar tarea y accesos directos (conserva los datos)
+
+Uso responsable: son probabilidades, no certezas. Ningún modelo garantiza acertar
+ni ganar dinero en apuestas.

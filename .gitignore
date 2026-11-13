@@ -1,0 +1,14 @@
+# Nunca se sube al repositorio público:
+datos/
+logs/
+_sitio/
+__pycache__/
+*.pyc
+*.lock
+*.tmp
+# el prompt maestro va solo cifrado (prompt_maestro.enc)
+prompt_maestro.txt
+prompt_maestro.pdf
+# claves
+*.key
+Acceso*.txt

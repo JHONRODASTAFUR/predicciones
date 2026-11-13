@@ -1,0 +1,77 @@
+# Actualiza las predicciones en los servidores gratuitos de GitHub y publica la página privada (cifrada).
+# - Cada hora (minuto ~07): actualización completa (como la tarea de la laptop).
+# - Minutos ~22, ~37 y ~52: revisión rápida de alineaciones confirmadas.
+# Los datos descargados se guardan entre corridas en la caché de GitHub (no en el repositorio público).
+name: Actualizar predicciones
+
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: actualizar
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    environment:
+      name: github-pages
+      url: ${{ steps.publicar.outputs.page_url }}
+    env:
+      TZ: America/Lima
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install numpy cryptography
+
+      - name: Recuperar datos de la corrida anterior
+        uses: actions/cache/restore@v4
+        with:
+          path: datos
+          key: datos-v1-${{ github.run_id }}
+          restore-keys: datos-v1-
+
+      - name: Actualizar predicciones
+        id: modo
+        run: |
+          M=$((10#$(date -u +%M)))
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ ! -f datos/predicciones.json ] || [ "$M" -lt 15 ]; then
+            echo "completa=si" >> "$GITHUB_OUTPUT"
+            python actualizar.py || echo "::warning::La actualización completa terminó con error"
+          else
+            echo "completa=no" >> "$GITHUB_OUTPUT"
+            python actualizar.py --rapido || echo "::warning::La revisión rápida terminó con error"
+          fi
+
+      - name: Guardar datos para la próxima corrida
+        if: steps.modo.outputs.completa == 'si' && hashFiles('datos/predicciones.json') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: datos
+          key: datos-v1-${{ github.run_id }}
+
+      - name: Armar la página cifrada
+        env:
+          CLAVE_PAGINA: ${{ secrets.CLAVE_PAGINA }}
+        run: python publicar_web.py
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _sitio
+
+      - id: publicar
+        uses: actions/deploy-pages@v4
