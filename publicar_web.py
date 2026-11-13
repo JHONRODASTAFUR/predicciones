@@ -56,7 +56,7 @@ def leer_prompt(clave):
 
 
 def main():
-    clave = os.environ.get("CLAVE_PAGINA", "")
+    clave = os.environ.get("CLAVE_PAGINA", "").strip()     # sin espacios ni saltos de línea invisibles
     if len(clave) < 12:
         sys.exit("Falta CLAVE_PAGINA (o es muy corta)")
     if "--cifrar-prompt" in sys.argv:
