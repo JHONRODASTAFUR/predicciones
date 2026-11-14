@@ -52,6 +52,13 @@ Página web privada 24/7 (GitHub, gratis)
   solo se ve la pantalla que la pide. El código del programa sí es público (plan gratis de GitHub).
   Proyecto: github.com/JHONRODASTAFUR/predicciones (pestaña "Actions" = historial de actualizaciones).
 
+Probabilidades ancladas a las cuotas (desde el 14/11/2026)
+  Cuando el partido tiene cuotas (ESPN publica las de ~4 de cada 10 partidos), las probabilidades
+  principales usan 90 % lo que dicen las cuotas (sin el margen de la casa) y 10 % el modelo. Prueba con
+  8 444 partidos pasados con cuotas de cierre: RPS 0,2094 (modelo solo) → 0,2023 (anclado). En los
+  partidos sin cuotas manda el modelo. La validación diaria lo vuelve a comprobar ("Con cuotas (ancla)"
+  en Resultados) y "Comparación con el mercado" sigue mostrando lo que opina el modelo solo.
+
 Noticias y bajas (Google Noticias, gratis)
   Cada actualización completa busca titulares de los últimos 5 días (lesión, baja, sancionado, duda,
   convocatoria, entrenador) de los equipos que juegan en las próximas 48 h (hasta 150 equipos por vez;
