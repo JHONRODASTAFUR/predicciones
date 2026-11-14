@@ -26,6 +26,54 @@ from motor import datos, geo, modelo  # noqa: E402
 from motor import conjunto, noticias  # noqa: E402
 
 
+# Con cuotas, los goles esperados se anclan al mercado. Evidencia (prueba retrospectiva de 52 semanas, 8 444
+# partidos con cuotas de cierre de football-data): RPS 1X2 0,2094 solo modelo → 0,2023 con 90 % mercado;
+# Brier de más/menos 2,5 0,2463 → 0,2410. En los partidos reales de la app pasó lo mismo (0,205 vs 0,193).
+PESO_MODELO_CON_CUOTAS = 0.10
+
+
+def ancla_mercado(e, P, cache):
+    """(λ local, λ visita, peso del modelo) implícitos en las cuotas del partido, o None si no hay cuotas fiables."""
+    c = e.get("cuotas") or {}
+    ci = c.get("cierre") or {}
+    x12 = [ci.get("h"), ci.get("x"), ci.get("a")]
+    if not all(x and x > 1 for x in x12):
+        return None
+    clave = (e["id"], tuple(x12), json.dumps(c.get("goles"), sort_keys=True))
+    if clave not in cache:
+        metodo = apuestas.METODO_DESMARGINADO.get("metodo")
+        pk = apuestas.desmarginar(x12, metodo)[0]
+        g = c.get("goles") or {}
+        po = linea = None
+        if g.get("over") and g.get("under") and g.get("linea") is not None:
+            po = apuestas.desmarginar([g["over"], g["under"]], metodo)[0][0]
+            linea = g["linea"]
+        mlh, mla, err = apuestas.lambdas_de_mercado(pk, P.rho, po, linea)
+        cache[clave] = (mlh, mla, PESO_MODELO_CON_CUOTAS) if err < 0.05 else None
+    return cache[clave]
+
+
+def evaluar_ancla(filas_val):
+    """Prueba diaria del ancla: en los partidos de la validación con cuotas de cierre (football-data), RPS del
+    modelo solo frente al modelo anclado con PESO_MODELO_CON_CUOTAS."""
+    mk = {}
+    for k, v in leer_json(apuestas.ARCHIVO_LAMBDAS, {}).items():
+        mk[k.split("|")[0]] = v
+    sel = [f for f in filas_val if f[9]["id"] in mk]
+    if len(sel) < 200:
+        return None
+    w = PESO_MODELO_CON_CUOTAS
+    lh = np.array([f[9]["lh"] for f in sel]); la = np.array([f[9]["la"] for f in sel])
+    mh = np.array([mk[f[9]["id"]][0] for f in sel]); ma = np.array([mk[f[9]["id"]][1] for f in sel])
+    yh = np.array([f[4] for f in sel], float); ya = np.array([f[5] for f in sel], float)
+    out = {"n": len(sel), "peso_modelo": w}
+    for nombre, (a, b) in {"modelo": (lh, la), "anclado": (np.exp(w * np.log(lh) + (1 - w) * np.log(mh)),
+                                                            np.exp(w * np.log(la) + (1 - w) * np.log(ma)))}.items():
+        pH, pD, pA, _, _ = modelo.resumen_matriz(modelo.matriz(a, b, sel[0][9]["rho"]))
+        out["rps_" + nombre] = round(float(modelo._metricas(pH, pD, pA, yh, ya)[0].mean()), 4)
+    return out
+
+
 def agregar_noticias(item, e, env, al, pred, P):
     """Noticias del partido, posibles bajas en el once probable y escenario «sin las posibles bajas»."""
     nots = env.get("noticias") or {}
@@ -292,7 +340,8 @@ def señales(e, pred, ctx, clima, mercado, alt_estadio, D):
         s.append({"tipo": "datos", "nivel": "amarillo",
                   "texto": "Pocos partidos recientes de uno de los equipos: intervalo amplio (D24.11)"})
     if mercado:
-        dif = max(abs(pred["pH"] - mercado["pH"]), abs(pred["pD"] - mercado["pD"]), abs(pred["pA"] - mercado["pA"]))
+        pm = pred.get("solo_modelo") or pred      # lo que opina el modelo antes de anclarlo a las cuotas
+        dif = max(abs(pm["pH"] - mercado["pH"]), abs(pm["pD"] - mercado["pD"]), abs(pm["pA"] - mercado["pA"]))
         if dif >= 0.10:
             s.append({"tipo": "mercado", "nivel": "amarillo",
                       "texto": f"Modelo y mercado difieren {dif * 100:.0f} puntos: el mercado puede saber de bajas o "
@@ -558,7 +607,8 @@ def construir_item(e, env):
     """Todo lo que la app muestra de un partido."""
     P, D, rng = env["P"], env["D"], env["rng"]
     mats = []
-    pred = modelo.predecir(P, D, e, rng, matrices=mats)
+    anc = ancla_mercado(e, P, env.setdefault("cache_ancla", {})) if e["estado"] in ("pre", "in") else None
+    pred = modelo.predecir(P, D, e, rng, matrices=mats, ancla=anc)
     al = None
     jug = env.get("jug")
     if jug and e["lg"] in alineaciones.LIGAS_JUGADORES and e["estado"] in ("pre", "in"):
@@ -569,7 +619,7 @@ def construir_item(e, env):
                                                     jug["cfg"]["goleadores"]["factor"])
             if conf and (abs(fh - 1) > 1e-9 or abs(fa - 1) > 1e-9):
                 mats = []                 # la alineación confirmada mueve los goles esperados (β validado)
-                pred = modelo.predecir(P, D, e, rng, matrices=mats, factores=(fh, fa))
+                pred = modelo.predecir(P, D, e, rng, matrices=mats, factores=(fh, fa), ancla=anc)
             al["casa"] = {"h": casa_y_fuera(env["por_equipo"], e["h"]["id"]),
                           "a": casa_y_fuera(env["por_equipo"], e["a"]["id"])}
         except Exception:
@@ -784,6 +834,8 @@ def ejecutar(forzar=False):
             bt = apuestas.backtest(filas_val, ch)
             bt["emparejados"] = len(ch)
             ajuste["apuestas"] = bt
+            ajuste["ancla"] = evaluar_ancla(filas_val)
+            log.info("Ancla al mercado: %s", ajuste["ancla"])
             log.info("Prueba de apuestas: %s", json.dumps({k: v for k, v in bt.items() if k != "perfiles"},
                                                          ensure_ascii=False))
             estado(fase="Probando córners, tarjetas y primer tiempo", progreso=81)
@@ -887,7 +939,7 @@ def ejecutar(forzar=False):
         "partidos": salida, "tablas": tablas,
         "modelo": {
             "mu": round(P.mu, 4), "rho": P.rho, "coef": {modelo.NOMBRE_COEF[k]: round(v, 4) for k, v in P.b.items()},
-            "competiciones": comps_info, "validacion": ajuste.get("validacion"),
+            "competiciones": comps_info, "validacion": ajuste.get("validacion"), "ancla": ajuste.get("ancla"),
             "fecha_validacion": ajuste.get("fecha_validacion"), "candidatas": ajuste.get("candidatas"),
             "n_partidos": int(jugados.sum()), "n_equipos": D.nT, "ranking": ranking[:300],
             "semanas_validacion": C.SEMANAS_VALIDACION,

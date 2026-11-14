@@ -412,10 +412,23 @@ def lambdas_partido(P, D, e, cov=None):
     }
 
 
-def predecir(P, D, e, rng, sims=SIMULACIONES_INTERVALO, matrices=None, factores=None):
+def predecir(P, D, e, rng, sims=SIMULACIONES_INTERVALO, matrices=None, factores=None, ancla=None):
     """Predicción del partido. Si se pasa una lista en `matrices`, se le agregan (M, Ms) para las apuestas.
-    `factores` = (local, visita): ajuste acotado por la alineación confirmada (D24.5, D24.16)."""
+    `factores` = (local, visita): ajuste acotado por la alineación confirmada (D24.5, D24.16).
+    `ancla` = (λ local del mercado, λ visita del mercado, peso del modelo): con cuotas, los goles esperados se
+    mezclan (en logaritmos) con los que implican las cuotas, porque en la prueba el mercado acertó más (D24.15)."""
     L = lambdas_partido(P, D, e)
+    solo_modelo = None
+    if ancla:
+        mlh, mla, w = ancla
+        M0 = matriz(np.array([L["lh"]]), np.array([L["la"]]), P.rho)
+        a, b, c, _, _ = resumen_matriz(M0)
+        solo_modelo = {"pH": round(float(a[0]), 4), "pD": round(float(b[0]), 4), "pA": round(float(c[0]), 4),
+                       "lh": round(L["lh"], 3), "la": round(L["la"], 3)}
+        L["lh"] = math.exp(w * math.log(L["lh"]) + (1 - w) * math.log(mlh))
+        L["la"] = math.exp(w * math.log(L["la"]) + (1 - w) * math.log(mla))
+        L["ancla"] = {"lh_mercado": round(mlh, 3), "la_mercado": round(mla, 3), "peso_modelo": w,
+                      "lh_modelo": solo_modelo["lh"], "la_modelo": solo_modelo["la"]}
     if factores:
         L["lh"] *= factores[0]
         L["la"] *= factores[1]
@@ -456,6 +469,7 @@ def predecir(P, D, e, rng, sims=SIMULACIONES_INTERVALO, matrices=None, factores=
         "top": [[i, j, round(p, 4)] for i, j, p in plano[:5]],
         "dist_goles": dist_goles, "conf": conf,
         "calc": _transparencia(P, D, L),
+        "solo_modelo": solo_modelo,
     }
 
 
@@ -489,6 +503,7 @@ def _transparencia(P, D, L):
         "f_visita": round(math.exp(L["ea"]) * (L.get("alineacion") or (1, 1))[1], 4),
         "alineacion": [round(x, 4) for x in L["alineacion"]] if L.get("alineacion") else None,
         "mezcla": L.get("mezcla"),
+        "ancla": L.get("ancla"),
     }
 
 

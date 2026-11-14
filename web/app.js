@@ -823,9 +823,10 @@ function htmlDetalle(m) {
   const mer = m.mercado;
   let mercado = `<p class="nota">ESPN no publica cuotas para este partido.</p>`;
   if (mer) {
+    const pm = m.pred.solo_modelo || p;     // el modelo solo, antes de anclarlo a las cuotas
     const fila = (n, a, b, ap) => `<tr><td>${n}</td><td class="num">${pct(a, 1)}</td><td class="num">${pct(b, 1)}</td><td class="num" style="color:${Math.abs(a - b) >= .1 ? "var(--amarillo)" : "inherit"}">${a - b >= 0 ? "+" : ""}${num((a - b) * 100, 1)}</td><td class="num">${ap != null ? pct(ap, 1) + " → " + pct(b, 1) : "–"}</td></tr>`;
-    mercado = `<table class="t"><tr><th></th><th class="num">Modelo</th><th class="num">Mercado</th><th class="num">Dif. (pp)</th><th class="num">Apertura → cierre</th></tr>
-      ${fila("Local", p.pH, mer.pH, mer.apertura?.pH)}${fila("Empate", p.pD, mer.pD, mer.apertura?.pD)}${fila("Visita", p.pA, mer.pA, mer.apertura?.pA)}</table>
+    mercado = `<table class="t"><tr><th></th><th class="num">Modelo solo</th><th class="num">Mercado</th><th class="num">Dif. (pp)</th><th class="num">Apertura → cierre</th></tr>
+      ${fila("Local", pm.pH, mer.pH, mer.apertura?.pH)}${fila("Empate", pm.pD, mer.pD, mer.apertura?.pD)}${fila("Visita", pm.pA, mer.pA, mer.apertura?.pA)}</table>
       <p class="nota">Cuotas de ${esc(mer.proveedor || "la casa")} vía ESPN: ${num(mer.cuotas.h)} / ${num(mer.cuotas.x)} / ${num(mer.cuotas.a)}. Margen de la casa ${pct(mer.margen, 1)}, eliminado de forma proporcional. Si el modelo difiere mucho del mercado, revisa primero el modelo: el mercado suele conocer bajas y alineaciones (D24.15).</p>`;
   }
 
@@ -856,8 +857,8 @@ function htmlDetalle(m) {
   const fH = neutral ? `√(H×V) = ${num(Math.sqrt(c.H_comp * c.V_comp), 3)}` : `H_comp ${num(c.H_comp, 3)} × h_estadio ${num(c.h_estadio, 3)}`;
   const fV = neutral ? `√(H×V) = ${num(Math.sqrt(c.H_comp * c.V_comp), 3)}` : `V_comp ${num(c.V_comp, 3)} × v_estadio ${num(c.v_estadio, 3)}`;
   const facs = (c.factores || []).map(f => `  · ${f.nombre}: coef ${num(f.coef, 4)} → ×${num(f.mult_local, 3)} local, ×${num(f.mult_visita, 3)} visita`).join("\n");
-  const formula = `λ_local  = μ ${num(c.mu, 3)} × ${fH} × A_local ${num(c.A_local, 3)} × D_visita ${num(c.D_visita, 3)} × f ${num(c.f_local, 3)} = ${num(m.pred.lh, 3)}
-λ_visita = μ ${num(c.mu, 3)} × ${fV} × A_visita ${num(c.A_visita, 3)} × D_local ${num(c.D_local, 3)} × g ${num(c.f_visita, 3)} = ${num(m.pred.la, 3)}
+  const formula = `λ_local  = μ ${num(c.mu, 3)} × ${fH} × A_local ${num(c.A_local, 3)} × D_visita ${num(c.D_visita, 3)} × f ${num(c.f_local, 3)} = ${num(c.mezcla?.lh_principal ?? c.ancla?.lh_modelo ?? m.pred.lh, 3)}
+λ_visita = μ ${num(c.mu, 3)} × ${fV} × A_visita ${num(c.A_visita, 3)} × D_local ${num(c.D_local, 3)} × g ${num(c.f_visita, 3)} = ${num(c.mezcla?.la_principal ?? c.ancla?.la_modelo ?? m.pred.la, 3)}
 
 P(i, j) = Poisson(i; λ_local) × Poisson(j; λ_visita) × τ(i, j)   con ρ Dixon-Coles = ${num(c.rho, 3)}
 P(local) = Σ P(i>j)   P(empate) = Σ P(i=j)   P(visita) = Σ P(i<j)
@@ -872,7 +873,10 @@ Conjunto (ligas de nivel 3-4; probado semana a semana, mejora el 1X2 ~1%):
   · modelo principal (arriba, antes de mezclar): ${num(c.mezcla.lh_principal, 3)} – ${num(c.mezcla.la_principal, 3)}  peso ${num(c.mezcla.pesos.principal, 2)}
   · mismo modelo con memoria corta (120 días):   ${num(c.mezcla.lh_corta, 3)} – ${num(c.mezcla.la_corta, 3)}  peso ${num(c.mezcla.pesos.corta, 2)}
   · Elo (diferencia ${num(c.mezcla.elo_dif, 0)} puntos con localía): 1 ${pct(c.mezcla.elo_1x2[0], 1)} · X ${pct(c.mezcla.elo_1x2[1], 1)} · 2 ${pct(c.mezcla.elo_1x2[2], 1)}  peso ${num(c.mezcla.pesos.elo, 2)}
-  · el TOTAL de goles se mantiene del modelo principal; la mezcla solo reparte entre local y visita → ${num(m.pred.lh, 3)} – ${num(m.pred.la, 3)}` : ""}`;
+  · el TOTAL de goles se mantiene del modelo principal; la mezcla solo reparte entre local y visita → ${num(c.ancla?.lh_modelo ?? m.pred.lh, 3)} – ${num(c.ancla?.la_modelo ?? m.pred.la, 3)}` : ""}${c.ancla ? `
+
+Ancla al mercado (hay cuotas): λ = λ_modelo^${num(c.ancla.peso_modelo, 2)} × λ_mercado^${num(1 - c.ancla.peso_modelo, 2)}
+  · modelo: ${num(c.ancla.lh_modelo, 3)} – ${num(c.ancla.la_modelo, 3)}   · cuotas sin margen: ${num(c.ancla.lh_mercado, 3)} – ${num(c.ancla.la_mercado, 3)}   → ${num(m.pred.lh, 3)} – ${num(m.pred.la, 3)}` : ""}`;
 
   const senales = (m.senales || []).map(s => `<div class="senal ${s.nivel}">${esc(s.texto)}</div>`).join("") || `<p class="nota">Sin señales especiales.</p>`;
 
@@ -892,7 +896,7 @@ Conjunto (ligas de nivel 3-4; probado semana a semana, mejora el 1X2 ~1%):
         <div class="caja x"><div class="tit">Empate</div><div class="grande">${pct(p.pD)}</div><div class="ic">${rango(p.ic?.pD)}</div></div>
         <div class="caja v"><div class="tit">Gana ${esc(m.a.n)}</div><div class="grande">${pct(p.pA)}</div><div class="ic">${rango(p.ic?.pA)}</div></div>
       </div>
-      <p class="nota">Confianza <span class="conf ${m.pred.conf}">${m.pred.conf}</span>. Son probabilidades, no certezas (R17): un 60% falla 4 de cada 10 veces.</p>
+      <p class="nota">Confianza <span class="conf ${m.pred.conf}">${m.pred.conf}</span>. Son probabilidades, no certezas (R17): un 60% falla 4 de cada 10 veces.${m.pred.calc?.ancla ? ` <b>Ancladas a las cuotas</b> (${num((1 - m.pred.calc.ancla.peso_modelo) * 100, 0)}% mercado, ${num(m.pred.calc.ancla.peso_modelo * 100, 0)}% modelo): en 8 444 partidos pasados así se acertó más que con el modelo solo. Lo que opina el modelo solo está en «Comparación con el mercado».` : ""}</p>
     </div>
     ${htmlApuesta(m)}
     ${htmlNoticias(m)}
@@ -1036,6 +1040,8 @@ function pintarResultados() {
   }
   const v = DATOS.modelo?.validacion?.global;
   if (v) k.push(kpi("Prueba retrospectiva", pct(v.acierto, 1), `RPS ${num(v.rps, 3)} vs ${num(v.rps_base, 3)} ingenuo · ${v.n} partidos`));
+  const an = DATOS.modelo?.ancla;
+  if (an) k.push(kpi("Con cuotas (ancla)", `RPS ${num(an.rps_anclado, 3)}`, `modelo solo ${num(an.rps_modelo, 3)} · ${an.n} partidos con cuotas de cierre · menos es mejor`));
   $("#kpis-hist").innerHTML = k.join("") + htmlRendimientoApuestas();
 
   const lista = DATOS.historial?.lista || [];
