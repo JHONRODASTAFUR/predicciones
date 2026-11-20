@@ -86,6 +86,7 @@ def main():
     index = index.replace("<head>", '<head>\n<meta name="robots" content="noindex, nofollow">', 1)
     index = index.replace('<script src="app.js"></script>',
                           f'<script>window.PF_ESTATICO = true;</script>\n<script src="app.js?v={v}"></script>')
+    index = index.replace('<script src="panel.js"></script>', f'<script src="panel.js?v={v}"></script>')
     index = index.replace('href="estilos.css"', f'href="estilos.css?v={v}"')
     (SALIDA / "index.html").write_text(index, encoding="utf-8")
     (SALIDA / "datos.bin").write_bytes(cifrar(crudo, clave))

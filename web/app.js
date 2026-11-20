@@ -8,7 +8,7 @@ const num = (x, d = 2) => (x == null || isNaN(x)) ? "–" : Number(x).toFixed(d)
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 let DATOS = null, ESTADO = {}, LIGAS = {}, ORDEN = {}, PROMPT = null, ULTIMA_CARGA = null, SERVIDOR_OK = true;
-const UI = Object.assign({ vista: "partidos", dia: "hoy", buscar: "", liga: "", soloDest: false, ligaHist: "", tabla: "", rank: "", perfil: "", banca: "" },
+const UI = Object.assign({ vista: "panel", dia: "hoy", buscar: "", liga: "", soloDest: false, ligaHist: "", tabla: "", rank: "", perfil: "", banca: "" },
   leerPref());
 
 function leerPref() { try { return JSON.parse(localStorage.getItem("pf_ui") || "{}"); } catch { return {}; } }
@@ -214,9 +214,11 @@ function lineaApuesta(m) {
     // las 3 recomendaciones juntas (una por perfil), la del perfil elegido resaltada
     const tres = ordenPerfiles().map(k => {
       const g = pickDe(m, k);
-      return g ? `<span class="ap3${k === perfilActual() ? " activo" : ""}" title="${esc(DATOS.apuestas.perfiles[k].texto || "")}"><small>${esc(DATOS.apuestas.perfiles[k].nombre)}</small><b>${esc(g.txt)}</b> ${pct(g.p)} · mín. <b>${num(g.minima)}</b></span>` : "";
+      return g ? `<span class="ap3${k === perfilActual() ? " activo" : ""}" title="${esc(DATOS.apuestas.perfiles[k].texto || "")}"><small>${esc(DATOS.apuestas.perfiles[k].nombre)}</small><b>${esc(g.txt)}</b> ${pct(g.p)} · mín. <b>${num(g.minima)}</b> ${window.PF_chip?.(m, k) || ""}</span>` : "";
     }).join("");
-    return `<div class="apuesta-linea"><span class="etq">APUESTAS</span>${tres}${etiquetaRiesgo(f)}
+    // veredicto del motor de inteligencia: si ninguna opción es sólida se dice claramente
+    const sinApuesta = m.intel?.veredicto?.cod === "no" ? `<span class="sin-apuesta" title="${esc(m.intel.veredicto.motivo)}">NO HAY APUESTA RECOMENDADA</span>` : "";
+    return `<div class="apuesta-linea"><span class="etq">APUESTAS</span>${sinApuesta}${tres}${etiquetaRiesgo(f)}
       ${m.apuesta.base === "mercado" ? `<span class="nota" title="Probabilidades ajustadas a las cuotas reales de la casa">según cuotas</span>` : ""}</div>`;
   }
   const pp = m.apuesta_previa?.perfiles;
@@ -379,6 +381,7 @@ function abrirDetalle(id) {
   $("#det-guardar").onclick = () => guardarPrompt(m);
   if ($("#det-pdf")) $("#det-pdf").onclick = () => api("/api/abrir_pdf", { method: "POST" })
     .then(r => r.web ? window.open("/api/pdf", "_blank") : toast(r.ok ? "Abriendo el PDF del prompt" : "No se encontró el PDF")).catch(() => { });
+  window.PF_detalle?.(m);      // bloques de inteligencia (panel.js): veredicto, simulación, escenarios y cancha
 }
 function cerrarDetalle() { $("#detalle").classList.remove("abierto"); $("#velo").classList.remove("abierto"); }
 
@@ -701,7 +704,7 @@ function pintarSimulacion(m, esc_ = null) {
       <td class="num nota">${pct(f.psim, 1)}</td><td class="num" title="Probabilidad con la que se decide: ${f.fuente === "mercado" ? "ajustada a las cuotas del mercado" : f.fuente === "modelo" ? "modelo recalibrado" : "simulación"}">${pct(f.p, 1)}</td>
       <td class="num">${num(1 / Math.max(f.p, 1e-6))}</td><td class="num"><b>${f.minima ? num(f.minima) : "–"}</b></td>
       <td>${f.minima ? `<input type="number" step="0.01" min="1.01" data-i="${i}" placeholder="cuota">` : ""}</td><td class="nota" id="ev-${i}"></td></tr>`).join("");
-    out.innerHTML = (esc_ ? `<div class="senal amarillo"><b>Escenario hipotético:</b> sin ${esc([...(esc_.fuera.h || []), ...(esc_.fuera.a || [])].join(", "))}${[...(esc_.entran.h || []), ...(esc_.entran.a || [])].length ? ` (entrarían ${esc([...(esc_.entran.h || []), ...(esc_.entran.a || [])].join(", "))})` : ""}. Es una simulación con lo que dicen las noticias, no una predicción comprobada: la tabla usa solo la simulación. Pulsa «Simular 10 000 partidos» para volver al partido normal.</div>` : "") + `<div class="tres">
+    out.innerHTML = (esc_?.txt ? `<div class="senal amarillo"><b>Escenario hipotético:</b> ${esc(esc_.txt)}. Es un supuesto, no una predicción comprobada: la tabla usa solo la simulación. Pulsa «Simular 10 000 partidos» para volver al partido normal.</div>` : esc_ ? `<div class="senal amarillo"><b>Escenario hipotético:</b> sin ${esc([...(esc_.fuera.h || []), ...(esc_.fuera.a || [])].join(", "))}${[...(esc_.entran.h || []), ...(esc_.entran.a || [])].length ? ` (entrarían ${esc([...(esc_.entran.h || []), ...(esc_.entran.a || [])].join(", "))})` : ""}. Es una simulación con lo que dicen las noticias, no una predicción comprobada: la tabla usa solo la simulación. Pulsa «Simular 10 000 partidos» para volver al partido normal.</div>` : "") + `<div class="tres">
         <div class="caja l"><div class="tit">Gana ${esc(m.h.n)}</div><div class="grande">${pct(r.pH, 1)}</div></div>
         <div class="caja x"><div class="tit">Empate</div><div class="grande">${pct(r.pD, 1)}</div></div>
         <div class="caja v"><div class="tit">Gana ${esc(m.a.n)}</div><div class="grande">${pct(r.pA, 1)}</div></div></div>
@@ -1179,6 +1182,17 @@ function pintarAyuda() {
     ["D25", "Perfil de errores", "No disponible", "Requiere datos de eventos por jugador que las fuentes gratuitas no dan."],
   ];
   $("#v-ayuda").innerHTML = `<h2>Cómo funciona</h2>
+  <h3>Novedades de la versión 3 (inteligencia)</h3>
+  <ul>
+    <li><b>Panel:</b> lo que pasa hoy de un vistazo: partidos, simulaciones, alineaciones pendientes, alertas, movimiento de cuotas y las mejores oportunidades (ordenadas por calidad de la evidencia, no por ganancia).</li>
+    <li><b>Clase de riesgo:</b> cada apuesta es Conservadora, Moderada, Riesgo elevado o Sin valor estadístico. Si ninguna es sólida, el programa dice <b>NO HAY APUESTA RECOMENDADA</b>.</li>
+    <li><b>Veredicto de cada partido:</b> factores a favor, riesgos, condiciones que la invalidan y discrepancias entre modelo, cuotas, racha, alineación y noticias.</li>
+    <li><b>Simulación de 10 000 escenarios:</b> ahora la calcula el programa, se puede repetir y trae su prueba de estabilidad. Añade ganador de alguna mitad, quién marca primero y escenarios de dominio.</li>
+    <li><b>¿Qué pasa si…?:</b> sin el goleador, sin el portero, rotando titulares, con diez jugadores o con tu propio supuesto.</li>
+    <li><b>Cancha y radar:</b> el once dibujado en la cancha, jugadores determinantes y posibles bajas.</li>
+    <li><b>Comparar, Combinadas y Mi banca:</b> compara dos partidos, evalúa combinadas sin multiplicar a ciegas (mide la correlación) y lleva tu registro con límites.</li>
+    <li><b>Lo que no hace:</b> no lee Betano (escribe tú la cuota), no tiene goles esperados por remate (xG) ni lesiones verificadas, porque las fuentes gratuitas autorizadas no los dan. No garantiza ganancias.</li>
+  </ul>
   <h3>Se actualiza solo</h3>
   <ul>
     <li>Una tarea de Windows llamada <b>PrediccionesFutbol</b> ejecuta la actualización <b>cada hora</b>, <b>al encender la laptop</b> y <b>cada vez que Windows se conecta a una red</b>. Solo corre si hay internet.</li>
@@ -1235,6 +1249,7 @@ function pintarTodo() {
   if (UI.vista === "tablas") pintarTablas();
   if (UI.vista === "modelo") pintarModelo();
   if (UI.vista === "ayuda") pintarAyuda();
+  window.PF_vistas?.[UI.vista]?.();      // vistas nuevas (panel.js): panel, comparar, combinada, banca
 }
 
 function cambiarVista(v) {

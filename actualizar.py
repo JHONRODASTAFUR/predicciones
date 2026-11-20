@@ -24,6 +24,7 @@ from motor import mercados_extra as mx  # noqa: E402
 from motor import config as C  # noqa: E402
 from motor import datos, geo, modelo  # noqa: E402
 from motor import conjunto, noticias  # noqa: E402
+from motor import inteligencia, simulacion, version  # noqa: E402
 
 
 # Con cuotas, los goles esperados se anclan al mercado. Evidencia (prueba retrospectiva de 52 semanas, 8 444
@@ -131,7 +132,8 @@ def con_conjunto(D, P, jugados):
 log = logging.getLogger("actualizar")
 ARCHIVO_TABLAS = C.DATOS / "tablas.json"
 ARCHIVO_LAMBDAS_OOS = C.DATOS / "lambdas_fuera_de_muestra.json"
-VENTANA_RAPIDA_H = 2.5          # la revisión de cada 15 min mira los partidos que empiezan en este plazo
+ARCHIVO_MOVIMIENTOS = C.DATOS / "cuotas_movimiento.json"     # fotos de las cuotas en cada actualización
+VENTANA_RAPIDA_H = 2.5         # la revisión de cada 15 min mira los partidos que empiezan en este plazo
 
 
 # ------------------------------------------------------------------ utilidades
@@ -385,7 +387,7 @@ def actualizar_historial(hist, partidos_pred, eventos_por_id):
         reg = hist.get(item["id"])
         nuevo = {"pH": p["pH"], "pD": p["pD"], "pA": p["pA"], "lh": p["lh"], "la": p["la"],
                  "o25": p["o25"], "btts": p["btts"], "top": p["top"][0], "ic": p["ic"],
-                 "guardado": ahora.isoformat(timespec="seconds")}
+                 "guardado": ahora.isoformat(timespec="seconds"), "version": version.VERSION_MODELO}
         if reg is None:
             reg = hist[item["id"]] = {"lg": item["lg"], "fecha": item["fecha"], "h": item["h"]["n"],
                                       "a": item["a"]["n"], "primera": nuevo}
@@ -652,6 +654,19 @@ def construir_item(e, env):
             item["extras"] = construir_extras(e, pred, D, env["extras"])
         except Exception:
             log.warning("Sin córners/tarjetas/tiempos para %s: %s", e["id"], traceback.format_exc(limit=2))
+    if e["estado"] == "pre" and item.get("matriz"):
+        # simulación Monte Carlo de 10 000 partidos (misma matriz que usa la app), con prueba de estabilidad
+        try:
+            ex = item.get("extras") or {}
+            item["sim"] = simulacion.simular((al or {}).get("matriz") or item["matriz"], e["id"],
+                                             prop_1t=(ex.get("tiempos") or {}).get("proporcion_1t"),
+                                             corners=ex.get("corners"), tarjetas=ex.get("tarjetas"))
+        except Exception:
+            log.warning("Sin simulación para %s: %s", e["id"], traceback.format_exc(limit=2))
+    if e["estado"] == "pre" and mer:
+        mv = inteligencia.movimiento(env.get("mov"), e, mer, ahora_iso())
+        if mv:
+            mer["movimiento"] = mv
     item["senales"] = señales(e, pred, ctx, cl, mer, lu.get("alt"), D)
     if al and al["estado"] == "confirmada" and (al["h"]["sale"] or al["a"]["sale"]):
         for lado in ("h", "a"):
@@ -674,6 +689,10 @@ def construir_item(e, env):
                                                   liga_val=env["val_ligas"].get(e["lg"]))
         except Exception:
             log.warning("Sin apuesta para %s: %s", e["id"], traceback.format_exc(limit=2))
+        try:        # clase de riesgo, veredicto, explicación, discrepancias y escenarios
+            inteligencia.analizar(item, e, env, jugadores.TOPE_AJUSTE)
+        except Exception:
+            log.warning("Sin análisis de inteligencia para %s: %s", e["id"], traceback.format_exc(limit=2))
     if e["fin"] or e["estado"] == "in":
         reg = hist.get(e["id"])
         if reg and "ultima" in reg:   # se muestra lo que se predijo ANTES del partido, no lo recalculado
@@ -727,7 +746,7 @@ def ejecutar_rapido():
                                       "peso_modelo": bt.get("peso_modelo", 0.0)},
            "val_ligas": (ajuste.get("validacion") or {}).get("por_liga", {}), "confirmadas": conf,
            "jug": preparar_jugadores(D, P, ajuste, None, False), "extras": preparar_extras(D, vida, ajuste),
-           "noticias": noticias.cargar()}
+           "noticias": noticias.cargar(), "mov": leer_json(ARCHIVO_MOVIMIENTOS, {})}
     nuevos = []
     for e in D.eventos:
         if e["id"] in conf:
@@ -740,6 +759,7 @@ def ejecutar_rapido():
     previas["alineaciones_actualizadas"] = ahora_iso()
     hist = actualizar_historial(env["hist"], nuevos, {e["id"]: e for e in D.eventos})
     guardar_historial(hist)
+    escribir_json(ARCHIVO_MOVIMIENTOS, env["mov"])
     escribir_json(C.ARCHIVO_PREDICCIONES, previas)
     estado(corriendo=False, fase="Listo", progreso=100, ultima_ok=ahora_iso(), error=None)
     log.info("Revisión rápida: alineaciones de %d partidos", len(nuevos))
@@ -904,7 +924,8 @@ def ejecutar(forzar=False):
     hist = leer_historial()
     env = {"P": P, "D": D, "rng": rng, "disc": disc, "tablas": tablas, "lugares": lugares, "por_equipo": por_equipo,
            "clima": clima, "hist": hist, "bt": bt, "config_valor": config_valor, "val_ligas": val_ligas,
-           "confirmadas": confirmadas, "jug": jug, "extras": extras, "noticias": nots}
+           "confirmadas": confirmadas, "jug": jug, "extras": extras, "noticias": nots,
+           "mov": inteligencia.limpiar_movimientos(leer_json(ARCHIVO_MOVIMIENTOS, {}))}
     salida = []
     for e in mostrar:
         try:
@@ -914,6 +935,7 @@ def ejecutar(forzar=False):
 
     hist = actualizar_historial(hist, salida, {e["id"]: e for e in D.eventos})
     guardar_historial(hist)
+    escribir_json(ARCHIVO_MOVIMIENTOS, env["mov"])
 
     # resumen del modelo para la pestaña "Modelo"
     comps_info = {}
@@ -934,7 +956,8 @@ def ejecutar(forzar=False):
     hist_lista = sorted([dict(id=k, **v) for k, v in hist.items() if v.get("res")],
                         key=lambda v: v["fecha"], reverse=True)[:400]
     res = {
-        "generado": ahora_iso(), "vida_media": vida,
+        "generado": ahora_iso(), "vida_media": vida, "version_modelo": version.VERSION_MODELO,
+        "simulacion": {"n": simulacion.N_SIM, "lotes": simulacion.LOTES},
         "ligas": [C.INFO_LIGA[c] for c, *_ in C.LIGAS],
         "partidos": salida, "tablas": tablas,
         "modelo": {
@@ -961,6 +984,12 @@ def ejecutar(forzar=False):
                                                           "estadísticas por jugador", "fecha": ahora_iso()},
             {"nombre": "Open-Meteo (open-meteo.com)", "uso": "ubicación y altitud de las ciudades, pronóstico del "
                                                              "clima", "fecha": ahora_iso()},
+            {"nombre": "Google Noticias (news.google.com)", "uso": "titulares de lesiones, sanciones y bajas "
+                                                                   "(sin verificar: solo informan)",
+             "fecha": max((v.get("t") or "" for v in (nots or {}).values() if isinstance(v, dict)), default="") or None},
+            {"nombre": "football-data.co.uk", "uso": "cuotas históricas de cierre para probar las apuestas y "
+                                                     "árbitros de Inglaterra y Escocia",
+             "fecha": ajuste.get("fecha_validacion")},
         ],
     }
     escribir_json(C.ARCHIVO_PREDICCIONES, res)

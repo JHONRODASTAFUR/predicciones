@@ -14,7 +14,11 @@
     Predicciones Fútbol
   </div>
   <nav id="nav">
-    <button data-vista="partidos" class="activo">Partidos</button>
+    <button data-vista="panel" class="activo">Panel</button>
+    <button data-vista="partidos">Partidos</button>
+    <button data-vista="comparar">Comparar</button>
+    <button data-vista="combinada">Combinadas</button>
+    <button data-vista="banca">Mi banca</button>
     <button data-vista="resultados">Resultados y aciertos</button>
     <button data-vista="tablas">Tablas</button>
     <button data-vista="modelo">Modelo</button>
@@ -30,7 +34,12 @@
 <main>
   <div id="avisos"></div>
 
-  <section class="vista activa" id="v-partidos">
+  <section class="vista activa" id="v-panel"></section>
+  <section class="vista" id="v-comparar"></section>
+  <section class="vista" id="v-combinada"></section>
+  <section class="vista" id="v-banca"></section>
+
+  <section class="vista" id="v-partidos">
     <div class="barra-herr">
       <div class="chips" id="dias"></div>
       <input class="buscar" id="buscar" type="search" placeholder="Buscar equipo…">
@@ -68,5 +77,6 @@
 <aside class="detalle" id="detalle" aria-live="polite"></aside>
 <div class="toast" id="toast"></div>
 <script src="app.js"></script>
+<script src="panel.js"></script>
 </body>
 </html>

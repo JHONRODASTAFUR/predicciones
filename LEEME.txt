@@ -7,6 +7,34 @@ Se actualiza: solo, con la tarea de Windows "PrediccionesFutbol":
               Si no hay internet, muestra lo último guardado y avisa.
 No necesita:  a Claude, cuentas ni claves.
 
+VERSIÓN 3 · INTELIGENCIA (desde el 20/11/2026)
+  Las probabilidades NO cambiaron (mismo modelo y misma ancla a las cuotas). Lo nuevo es cómo se analizan,
+  se explican y se muestran:
+  - Panel: partidos de hoy, simulaciones, alineaciones pendientes, alertas de bajas, movimiento de cuotas y
+    mejores oportunidades (ordenadas por calidad de la evidencia, no por ganancia).
+  - Clase de riesgo de cada apuesta: Conservadora, Moderada, Riesgo elevado o Sin valor estadístico.
+    Si ninguna es sólida: «NO HAY APUESTA RECOMENDADA» (ya no se fuerza un pronóstico).
+  - Veredicto por partido: factores a favor, riesgos, condiciones que lo invalidan y discrepancias
+    (modelo vs cuotas, racha, alineación, noticias). Carga de partidos y kilómetros de viaje del visitante.
+  - Simulación de 10 000 escenarios calculada por el programa (motor\simulacion.py): se puede repetir
+    (semilla fija por partido), trae intervalo del 95 % y prueba de estabilidad (10 lotes + valor exacto).
+    Añade ganador de alguna mitad, quién marca primero y escenarios de dominio.
+  - ¿Qué pasa si…?: sin el goleador, sin el portero, rotando 3 titulares (con el ajuste validado de las
+    alineaciones), con diez jugadores (valores de un estudio publicado, editables) o tu propio supuesto.
+  - Cancha con el once, radar de jugadores determinantes, comparador de partidos, evaluador de combinadas
+    (mide la correlación en vez de multiplicar a ciegas) y «Mi banca» (límites, registro, ganancias y pérdidas;
+    se guarda solo en el dispositivo).
+  - Movimiento de cuotas: se guarda una lectura en cada actualización (datos\cuotas_movimiento.json).
+  - Cada predicción del historial guarda la versión del modelo (motor\version.py).
+  Lo que NO hace, y por qué:
+  - No lee Betano, Sofascore, Flashscore, FotMob, Transfermarkt ni FBref: sus condiciones no lo permiten.
+    La cuota de Betano se escribe a mano.
+  - No tiene xG por remate, lesiones verificadas ni datos tácticos de eventos: las fuentes gratuitas
+    autorizadas no los dan. Donde falta el dato, el programa lo dice y no lo inventa.
+  - No hay evidencia propia del efecto de la lluvia ni de las expulsiones: esos escenarios son supuestos.
+  Pruebas automáticas:   python -m unittest discover -s pruebas -v      (19 pruebas, sin internet)
+  Volver a la versión anterior:   git checkout antes-transformacion-2026-11-20
+
 Fuentes (gratuitas, sin cuenta)
   - ESPN (site.api.espn.com): resultados, calendario, tablas, tarjetas, penales y cuotas.
   - Open-Meteo (open-meteo.com): altitud de las ciudades y clima del partido.
