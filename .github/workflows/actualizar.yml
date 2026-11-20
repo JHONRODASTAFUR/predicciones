@@ -86,5 +86,25 @@ jobs:
         with:
           path: _sitio
 
+      # A veces GitHub aún no «ve» el paquete recién subido y la publicación falla («No artifacts named
+      # github-pages»). Pasaba en ~1 de cada 10 corridas: ahora se reintenta hasta dos veces antes de rendirse.
       - id: publicar
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Esperar antes del segundo intento
+        if: steps.publicar.outcome == 'failure'
+        run: sleep 30
+
+      - id: publicar2
+        if: steps.publicar.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Esperar antes del tercer intento
+        if: steps.publicar2.outcome == 'failure'
+        run: sleep 60
+
+      - id: publicar3
+        if: steps.publicar2.outcome == 'failure'
         uses: actions/deploy-pages@v4
