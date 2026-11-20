@@ -80,6 +80,19 @@ Página web privada 24/7 (GitHub, gratis)
   solo se ve la pantalla que la pide. El código del programa sí es público (plan gratis de GitHub).
   Proyecto: github.com/JHONRODASTAFUR/predicciones (pestaña "Actions" = historial de actualizaciones).
 
+Botón «Actualizar ahora» en la página web (desde el 20/11/2026)
+  La página es un archivo fijo: no puede calcular sola. El botón le pide a GitHub que ejecute una
+  actualización completa (descargar, recalcular, simular y publicar), muestra el avance y al terminar
+  carga los datos nuevos. Tarda de 2 a 4 minutos.
+  Solo la primera vez en cada dispositivo pide un permiso (token) de tu cuenta de GitHub:
+    github.com → foto → Settings → Developer settings → Personal access tokens → Fine-grained tokens
+    → Generate new token → Only select repositories: predicciones → Permissions: Actions = Read and write.
+  El token se guarda solo en ese dispositivo (no se publica) y solo sirve para pedir actualizaciones de este
+  proyecto. Si vence, el botón vuelve a pedirlo. «Ahora no» solo trae lo último ya publicado.
+  Arreglo del mismo día: GitHub retrasa las corridas automáticas y casi todas quedaban como «revisión
+  rápida» (solo alineaciones), así que la página pasaba horas sin actualizarse de verdad. Ahora la corrida
+  automática es completa siempre que los datos tengan 45 minutos o más.
+
 Probabilidades ancladas a las cuotas (desde el 14/11/2026)
   Cuando el partido tiene cuotas (ESPN publica las de ~4 de cada 10 partidos), las probabilidades
   principales usan 90 % lo que dicen las cuotas (sin el margen de la casa) y 10 % el modelo. Prueba con

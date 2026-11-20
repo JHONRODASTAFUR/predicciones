@@ -73,7 +73,9 @@ def main():
     except Exception:
         estado = {}
     version = estado.get("ultima_ok") or datos.get("generado") or dt.datetime.now(dt.timezone.utc).isoformat()
-    paquete = {"datos": datos, "estado": estado, "prompt": leer_prompt(clave)}
+    # «repo» (dueño/proyecto, lo da GitHub) le dice al botón «Actualizar ahora» a qué flujo llamar; no es secreto
+    paquete = {"datos": datos, "estado": estado, "prompt": leer_prompt(clave),
+               "repo": os.environ.get("GITHUB_REPOSITORY", "")}
     crudo = gzip.compress(json.dumps(paquete, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6)
 
     shutil.rmtree(SALIDA, ignore_errors=True)

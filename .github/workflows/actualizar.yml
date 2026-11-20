@@ -1,6 +1,8 @@
 # Actualiza las predicciones en los servidores gratuitos de GitHub y publica la página privada (cifrada).
-# - Cada hora (minuto ~07): actualización completa (como la tarea de la laptop).
-# - Minutos ~22, ~37 y ~52: revisión rápida de alineaciones confirmadas.
+# - Se intenta cada 15 minutos (GitHub suele retrasar o saltarse corridas programadas).
+# - Si la última actualización completa tiene 45 minutos o más: actualización completa.
+#   Si es más reciente: revisión rápida de alineaciones confirmadas.
+# - Desde la página, el botón «Actualizar ahora» lanza una completa al momento (workflow_dispatch).
 # Los datos descargados se guardan entre corridas en la caché de GitHub (no en el repositorio público).
 name: Actualizar predicciones
 
@@ -48,8 +50,19 @@ jobs:
       - name: Actualizar predicciones
         id: modo
         run: |
-          M=$((10#$(date -u +%M)))
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ ! -f datos/predicciones.json ] || [ "$M" -lt 15 ]; then
+          # ¿Completa o rápida? Antes se decidía por el minuto del reloj, pero GitHub retrasa las corridas
+          # programadas y casi todas caían en «rápida»: la página pasaba horas sin actualizarse de verdad.
+          # Ahora se mira la EDAD de los datos: si la última completa tiene 45 minutos o más, toca completa.
+          EDAD=$(python -c "
+          import json, datetime as dt
+          try:
+              g = json.load(open('datos/predicciones.json', encoding='utf-8'))['generado']
+              print(int((dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(g)).total_seconds() // 60))
+          except Exception:
+              print(99999)
+          ")
+          echo "Minutos desde la última actualización completa: $EDAD"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$EDAD" -ge 45 ]; then
             echo "completa=si" >> "$GITHUB_OUTPUT"
             python actualizar.py || echo "::warning::La actualización completa terminó con error"
           else

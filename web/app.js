@@ -73,7 +73,7 @@ async function apiWeb(ruta) {
   if (ruta === "/api/abrir_pdf") return { ok: false };
   const p = await paqueteWeb();
   if (ruta === "/api/datos") return p.datos;
-  if (ruta === "/api/estado") return Object.assign({}, p.estado, { corriendo: false });
+  if (ruta === "/api/estado") return ACTUALIZANDO_WEB ? ESTADO : Object.assign({}, p.estado, { corriendo: false }, AVISO_WEB ? { error: AVISO_WEB } : {});
   if (ruta === "/api/prompt") return p.prompt || "";
   throw new Error("ruta");
 }
@@ -100,6 +100,98 @@ function pantallaClave(error) {
 async function probarClave(pass) {
   CLAVE_WEB = pass; PAQUETE = null;
   try { await paqueteWeb(); return true; } catch { CLAVE_WEB = null; return false; }
+}
+
+// ---------------------------------------------------------------- «Actualizar ahora» en la página web
+// Cómo funciona: la página no puede calcular nada sola (es un archivo estático). El botón le pide a GitHub que
+// ejecute el flujo «Actualizar predicciones» (descarga datos, recalcula, simula y publica) y espera a que termine.
+// Para pedirlo hace falta un permiso (token) de tu cuenta de GitHub: se pega una vez y queda guardado SOLO en
+// este dispositivo (nunca se publica ni viaja a otro sitio que no sea api.github.com).
+let ACTUALIZANDO_WEB = false, AVISO_WEB = null;
+const FLUJO_WEB = "actualizar.yml";
+const espera = ms => new Promise(r => setTimeout(r, ms));
+const repoWeb = () => PAQUETE?.repo || `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0] || ""}`;
+function tokenWeb() { try { return localStorage.getItem("pf_token") || ""; } catch { return ""; } }
+async function github(ruta, op = {}) {
+  const r = await fetch(`https://api.github.com/repos/${repoWeb()}/actions/${ruta}`, Object.assign({ cache: "no-store" }, op,
+    { headers: Object.assign({ Authorization: "Bearer " + tokenWeb(), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
+      op.body ? { "Content-Type": "application/json" } : {}) }));
+  if (!r.ok) throw Object.assign(new Error("GitHub " + r.status), { codigo: r.status });
+  return r.status === 204 ? null : r.json();
+}
+async function traerUltimoWeb(mensaje) {
+  try { PAQUETE = null; await cargarDatos(); ESTADO = await api("/api/estado"); pintarEstado(); toast(mensaje); }
+  catch { toast("No se pudo descargar: revisa tu internet"); }
+}
+function pantallaToken(error) {
+  if ($("#acceso-token")) return;
+  document.body.insertAdjacentHTML("beforeend", `<div class="acceso" id="acceso-token"><form class="acceso-caja" id="token-form" style="width:min(520px,100%)">
+    <h2>Activar «Actualizar ahora»</h2>
+    <p class="nota">Este botón le pide a GitHub una actualización completa (2 a 4 minutos). Para eso necesita un permiso de tu cuenta de GitHub, llamado <b>token</b>. Se crea una sola vez y se guarda solo en este dispositivo.</p>
+    <ol class="nota" style="padding-left:18px;margin:0;display:grid;gap:4px">
+      <li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">github.com → crear token</a> con tu cuenta.</li>
+      <li>Nombre: «Actualizar predicciones». Caducidad: la más larga que te deje.</li>
+      <li>Repository access: <b>Only select repositories</b> → <b>${esc(repoWeb().split("/")[1] || "predicciones")}</b>.</li>
+      <li>Permissions → Repository permissions → <b>Actions: Read and write</b>. Nada más.</li>
+      <li>Pulsa <b>Generate token</b>, cópialo y pégalo aquí.</li></ol>
+    <input type="password" id="token-in" autocomplete="off" placeholder="github_pat_…" required>
+    <button class="boton primario" type="submit">Guardar y actualizar</button>
+    <button class="boton" type="button" id="token-solo">Ahora no: solo traer lo último publicado</button>
+    <p class="nota" id="token-msg">${error ? esc(error) : "Ese token solo sirve para pedir actualizaciones de este proyecto: no da acceso a tu cuenta ni a tu código."}</p></form></div>`);
+  $("#token-in").focus();
+  $("#token-solo").onclick = () => { $("#acceso-token").remove(); traerUltimoWeb("Datos al día con lo último publicado"); };
+  $("#token-form").onsubmit = ev => {
+    ev.preventDefault();
+    const t = $("#token-in").value.trim();
+    if (t.length < 20) { $("#token-msg").textContent = "Ese texto no parece un token: cópialo completo."; return; }
+    try { localStorage.setItem("pf_token", t); } catch { $("#token-msg").textContent = "Este navegador no deja guardar el token (¿modo privado?)."; return; }
+    $("#acceso-token").remove();
+    actualizarWeb();
+  };
+}
+async function actualizarWeb() {
+  if (ACTUALIZANDO_WEB) return toast("Ya hay una actualización en curso");
+  if (!tokenWeb()) return pantallaToken();
+  ACTUALIZANDO_WEB = true; AVISO_WEB = null;
+  const fase = (t, p) => { ESTADO = Object.assign({}, ESTADO, { corriendo: true, actualizado: new Date().toISOString(), fase: t, progreso: Math.round(p), error: null }); pintarEstado(); };
+  try {
+    fase("Conectando con GitHub…", 3);
+    const ultima = async () => (await github(`workflows/${FLUJO_WEB}/runs?event=workflow_dispatch&per_page=1`)).workflow_runs[0];
+    let run = await ultima();
+    if (!run || run.status === "completed") {          // si ya se pidió una (desde otro dispositivo), se sigue esa
+      const t0 = Date.now();
+      await github(`workflows/${FLUJO_WEB}/dispatches`, { method: "POST", body: JSON.stringify({ ref: "main" }) });
+      fase("Actualización pedida: GitHub la está preparando…", 8);
+      run = null;
+      for (let i = 0; i < 25 && !run; i++) {
+        await espera(3000);
+        const r = await ultima();
+        if (r && Date.parse(r.created_at) >= t0 - 90000 && r.status !== "completed") run = r;
+      }
+      if (!run) throw new Error("GitHub no arrancó la actualización");
+    }
+    const inicio = Date.now();
+    while (run.status !== "completed") {
+      const min = (Date.now() - inicio) / 60000;
+      if (min > 25) throw new Error("GitHub está tardando demasiado");
+      fase(run.status === "in_progress" ? "GitHub está descargando datos y analizando los partidos…" : "En cola en GitHub (puede haber otra corrida delante)…", Math.min(92, 10 + min * 25));
+      await espera(8000);
+      run = await github(`runs/${run.id}`);
+    }
+    if (run.conclusion !== "success") throw new Error("la actualización en GitHub terminó con error");
+    fase("Descargando los datos nuevos…", 96);
+    for (let i = 0; i < 20 && (await versionWeb()) === VERSION_PAQUETE; i++) await espera(4000);     // la página tarda unos segundos en publicarse
+    ACTUALIZANDO_WEB = false;
+    await traerUltimoWeb("Listo: datos actualizados y partidos analizados");
+  } catch (e) {
+    ACTUALIZANDO_WEB = false;
+    if ([401, 403, 404].includes(e.codigo)) {           // token vencido, mal copiado o sin el permiso «Actions»
+      try { localStorage.removeItem("pf_token"); } catch { }
+      pantallaToken(e.codigo === 401 ? "GitHub no reconoce ese token (venció o está mal copiado). Crea uno nuevo." : "Al token le falta el permiso «Actions: Read and write» sobre este proyecto. Crea uno nuevo siguiendo los pasos.");
+    } else AVISO_WEB = `No se pudo actualizar ahora: ${e.message || "sin conexión"}. La página sigue con los datos anteriores; vuelve a intentarlo en un minuto.`;
+    try { ESTADO = await api("/api/estado"); } catch { ESTADO.corriendo = false; }
+    pintarEstado();
+  }
 }
 
 // ---------------------------------------------------------------- servidor
@@ -165,11 +257,7 @@ function pintarEstado() {
 }
 
 async function actualizar() {
-  if (ESTATICO) {         // en la página web se actualiza sola cada hora: el botón solo trae lo último publicado
-    try { PAQUETE = null; await cargarDatos(); ESTADO = await api("/api/estado"); pintarEstado(); toast("Datos al día (la página se actualiza sola cada hora)"); }
-    catch { toast("No se pudo descargar: revisa tu internet"); }
-    return;
-  }
+  if (ESTATICO) return actualizarWeb();      // en la página web: pide a GitHub una actualización completa
   try {
     const r = await api("/api/actualizar", { method: "POST" });
     toast(r.iniciado ? "Actualizando… puedes seguir usando la app" : "Ya hay una actualización en curso");
@@ -1273,7 +1361,7 @@ function iniciar() {
   $("#velo").onclick = cerrarDetalle;
   document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarDetalle(); });
   $("#btn-actualizar").onclick = actualizar;
-  if (ESTATICO) { $("#btn-actualizar").textContent = "Traer lo último"; $("#btn-actualizar").title = "La página se actualiza sola cada hora"; }
+  if (ESTATICO) $("#btn-actualizar").title = "Pide a GitHub una actualización completa (2 a 4 minutos). También se actualiza sola cada hora.";
   const ping = () => api("/api/ping").then(() => { if (!SERVIDOR_OK) { SERVIDOR_OK = true; pintarEstado(); } }).catch(() => { SERVIDOR_OK = false; pintarEstado(); });
   ping(); setInterval(ping, 15000);
   setInterval(() => { if (!ESTADO.corriendo) pintarEstado(); if (DATOS && UI.vista === "partidos") pintarPartidos(); }, 60000);
