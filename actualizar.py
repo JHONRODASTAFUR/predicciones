@@ -25,6 +25,7 @@ from motor import config as C  # noqa: E402
 from motor import datos, geo, modelo  # noqa: E402
 from motor import conjunto, noticias  # noqa: E402
 from motor import inteligencia, simulacion, version  # noqa: E402
+from motor import auditoria, goles, necesidad  # noqa: E402
 
 
 # Con cuotas, los goles esperados se anclan al mercado. Evidencia (prueba retrospectiva de 52 semanas, 8 444
@@ -409,6 +410,10 @@ def actualizar_historial(hist, partidos_pred, eventos_por_id):
             if ap.get("valor"):
                 v = ap["valor"]
                 reg["apuesta"]["valor"] = {**v, "cuota_casa": por_cod[v["cod"]].get("cuota_casa")}
+        try:        # tres momentos, qué cambió y por qué, primera cuota y cierre (motor/auditoria.py)
+            auditoria.registrar(reg, item, ahora)
+        except Exception:
+            log.warning("Sin registro de momentos para %s: %s", item["id"], traceback.format_exc(limit=2))
     for eid, reg in hist.items():
         if reg.get("res"):
             continue
@@ -430,10 +435,20 @@ def actualizar_historial(hist, partidos_pred, eventos_por_id):
                 if x.get("cuota_casa"):
                     x["ganancia"] = round(x["cuota_casa"] - 1 if x["res"] == "gana" else
                                           (0.0 if x["res"] == "devuelve" else -1.0), 3)
+            auditoria.liquidar(reg, yh, ya, modelo.liquidar)
     limite = (ahora - dt.timedelta(days=400)).isoformat()
     for eid in [k for k, v in hist.items() if v.get("fecha", "") < limite]:
         del hist[eid]
     return hist
+
+
+def poner_momentos(partidos, hist):
+    """Lleva a cada partido de la app sus tres momentos y el registro de cambios guardados en el historial."""
+    for it in partidos:
+        reg = hist.get(it["id"]) or {}
+        for k in ("momentos", "cambios"):
+            if reg.get(k):
+                it[k] = reg[k]
 
 
 def resumen_historial(hist):
@@ -628,6 +643,12 @@ def construir_item(e, env):
             log.warning("Sin análisis de alineación para %s: %s", e["id"], traceback.format_exc(limit=3))
             al = None
     ctx = contexto(D, e, env["por_equipo"], env["tablas"])
+    nec = None
+    if e["estado"] in ("pre", "in"):
+        try:        # qué se juega cada equipo en la tabla (motor/necesidad.py): contexto, no cambia probabilidades
+            nec = necesidad.de_partido(env.get("nec"), e, ctx)
+        except Exception:
+            log.warning("Sin necesidad en la tabla para %s: %s", e["id"], traceback.format_exc(limit=2))
     lu = env["lugares"].get(geo.clave(e.get("ciudad"), e.get("pais"))) or {}
     mer = prob_mercado(e.get("cuotas"))
     cl = env["clima"].get(e["id"])
@@ -641,6 +662,8 @@ def construir_item(e, env):
         "pred": pred, "disciplina": env["disc"].predecir(D, e, rng), "mercado": mer, "clima": cl, "ctx": ctx,
         "alineacion": al,
     }
+    if nec:
+        item["necesidad"] = nec
     if e["estado"] == "pre":
         try:
             agregar_noticias(item, e, env, al, pred, P)
@@ -732,6 +755,7 @@ def ejecutar_rapido():
     ajuste = leer_json(C.ARCHIVO_AJUSTE, {})
     vida = ajuste.get("vida", C.VIDA_MEDIA_POR_DEFECTO)
     P = con_conjunto(D, modelo.ajustar(D, D.t < D.ahora, D.ahora, vida, iters=200), D.t < D.ahora)
+    P.factor_goles = (ajuste.get("goles") or {}).get("factor", 1.0)
     bt = ajuste.get("apuestas") or {}
     apuestas.METODO_DESMARGINADO["metodo"] = bt.get("metodo", "proporcional")
     por_equipo = {}
@@ -746,7 +770,12 @@ def ejecutar_rapido():
                                       "peso_modelo": bt.get("peso_modelo", 0.0)},
            "val_ligas": (ajuste.get("validacion") or {}).get("por_liga", {}), "confirmadas": conf,
            "jug": preparar_jugadores(D, P, ajuste, None, False), "extras": preparar_extras(D, vida, ajuste),
-           "noticias": noticias.cargar(), "mov": leer_json(ARCHIVO_MOVIMIENTOS, {})}
+           "noticias": noticias.cargar(), "mov": leer_json(ARCHIVO_MOVIMIENTOS, {}),
+           "abstener": set((previas.get("auditoria") or {}).get("abstener") or [])}
+    try:
+        env["nec"] = necesidad.preparar(env["tablas"], D, P)
+    except Exception:
+        log.warning("Sin necesidad en la tabla: %s", traceback.format_exc(limit=2))
     nuevos = []
     for e in D.eventos:
         if e["id"] in conf:
@@ -759,6 +788,7 @@ def ejecutar_rapido():
     previas["alineaciones_actualizadas"] = ahora_iso()
     hist = actualizar_historial(env["hist"], nuevos, {e["id"]: e for e in D.eventos})
     guardar_historial(hist)
+    poner_momentos(previas["partidos"], hist)
     escribir_json(ARCHIVO_MOVIMIENTOS, env["mov"])
     escribir_json(C.ARCHIVO_PREDICCIONES, previas)
     estado(corriendo=False, fase="Listo", progreso=100, ultima_ok=ahora_iso(), error=None)
@@ -843,9 +873,16 @@ def ejecutar(forzar=False):
     filas_val = None
     fecha_val = ajuste.get("fecha_validacion", "")
     if forzar or fecha_val[:10] != dt.date.today().isoformat() or "validacion" not in ajuste \
-            or "apuestas" not in ajuste or "extras" not in ajuste:
+            or "apuestas" not in ajuste or "extras" not in ajuste or "goles" not in ajuste:
         estado(fase="Validando con partidos pasados (D24.17)", progreso=74)
         filas_val = modelo.validar(D, vida, C.SEMANAS_VALIDACION, conjunto=True)
+        try:        # factor de goles reciente: se mide semana a semana y solo se aplica si mejora (motor/goles.py)
+            filas_val, ajuste["goles"] = goles.ajustar_validacion(
+                filas_val, {e["id"]: e["fecha"] for e in D.eventos}, modelo.matriz, modelo.resumen_matriz)
+            log.info("Goles: %s", goles.texto(ajuste["goles"]))
+        except Exception:
+            ajuste["goles"] = {"aplicado": False, "factor": 1.0, "error": True}
+            log.warning("No se pudo evaluar el factor de goles: %s", traceback.format_exc(limit=3))
         ajuste["validacion"] = modelo.resumir_validacion(filas_val)
         ajuste["fecha_validacion"] = ahora_iso()
         estado(fase="Probando las apuestas con cuotas reales (football-data.co.uk)", progreso=79)
@@ -883,6 +920,7 @@ def ejecutar(forzar=False):
     estado(fase="Calculando fuerzas de los equipos", progreso=84)
     jugados = D.t < D.ahora
     P = con_conjunto(D, modelo.ajustar(D, jugados, D.ahora, vida, iters=200), jugados)
+    P.factor_goles = (ajuste.get("goles") or {}).get("factor", 1.0)
     disc = modelo.ModeloDisciplina(D, D.ahora, vida)
 
     # partidos a mostrar
@@ -926,6 +964,16 @@ def ejecutar(forzar=False):
            "clima": clima, "hist": hist, "bt": bt, "config_valor": config_valor, "val_ligas": val_ligas,
            "confirmadas": confirmadas, "jug": jug, "extras": extras, "noticias": nots,
            "mov": inteligencia.limpiar_movimientos(leer_json(ARCHIVO_MOVIMIENTOS, {}))}
+    try:        # ligas donde el modelo no supera a la referencia simple: sin cuotas, no se recomienda apostar
+        env["abstener"] = set(auditoria.resumen(hist).get("abstener") or [])
+    except Exception:
+        log.warning("Sin auditoría previa: %s", traceback.format_exc(limit=2))
+    try:
+        env["nec"] = necesidad.preparar(tablas, D, P)
+        log.info("Necesidad en la tabla: %d ligas con tabla, %d simuladas", len(env["nec"]["ligas"]),
+                 sum(1 for x in env["nec"]["ligas"].values() if x.simulada))
+    except Exception:
+        log.warning("Sin necesidad en la tabla: %s", traceback.format_exc(limit=2))
     salida = []
     for e in mostrar:
         try:
@@ -935,6 +983,12 @@ def ejecutar(forzar=False):
 
     hist = actualizar_historial(hist, salida, {e["id"]: e for e in D.eventos})
     guardar_historial(hist)
+    poner_momentos(salida, hist)
+    try:
+        aud = auditoria.resumen(hist)
+    except Exception:
+        aud = None
+        log.warning("Sin auditoría: %s", traceback.format_exc(limit=2))
     escribir_json(ARCHIVO_MOVIMIENTOS, env["mov"])
 
     # resumen del modelo para la pestaña "Modelo"
@@ -958,6 +1012,9 @@ def ejecutar(forzar=False):
     res = {
         "generado": ahora_iso(), "vida_media": vida, "version_modelo": version.VERSION_MODELO,
         "simulacion": {"n": simulacion.N_SIM, "lotes": simulacion.LOTES},
+        "auditoria": aud, "goles": ajuste.get("goles"), "extras_prueba": {
+            k: {"n": len(v), "pasan": sum(1 for x in v.values() if x.get("ok"))}
+            for k, v in (ajuste.get("extras") or {}).items()},
         "ligas": [C.INFO_LIGA[c] for c, *_ in C.LIGAS],
         "partidos": salida, "tablas": tablas,
         "modelo": {

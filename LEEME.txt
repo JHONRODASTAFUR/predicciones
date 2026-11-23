@@ -7,6 +7,37 @@ Se actualiza: solo, con la tarea de Windows "PrediccionesFutbol":
               Si no hay internet, muestra lo último guardado y avisa.
 No necesita:  a Claude, cuentas ni claves.
 
+VERSIÓN 3.1 · AUDITORÍA (desde el 22/11/2026)
+  Se auditó el programa con 1 398 partidos ya jugados (predicción guardada antes de cada uno) y con 23 340
+  partidos predichos sin mirar el futuro. Qué cambió:
+  - Necesidad en la tabla (motor\necesidad.py): en ligas de ida y vuelta se simula 4 000 veces lo que falta
+    de temporada y se muestra la probabilidad de título, copas o descenso de cada equipo, cuánto cambia si
+    gana, empata o pierde ESTE partido, y si «necesita ganar» o «le sirve el empate». En otras ligas solo
+    se describe (puesto, puntos, distancia a cada zona). En eliminatorias, el marcador global.
+    Regla: necesitar ganar NO es tener más probabilidad de ganar. Es contexto; no toca las probabilidades.
+  - Factor de goles reciente (motor\goles.py): el modelo se quedaba corto en goles (esperaba 2,68 por partido
+    y hubo 2,76; cerca de 6 % en las últimas semanas). Cada semana se compara lo esperado con lo real de las
+    10 semanas anteriores y eso corrige la siguiente. Solo se aplica si mejora la prueba semana a semana; si
+    deja de mejorar se apaga solo. Para apagarlo a mano: ACTIVO = False en motor\goles.py.
+  - Los EMPATES no se tocaron: en 23 340 partidos fuera de muestra el desvío es azar (25,5 % predicho,
+    25,0 % real) y cambiar el parámetro empeoraba la prueba.
+  - Tres momentos (motor\auditoria.py): se guarda el pronóstico 24-48 h antes, 3-6 h antes y con la
+    alineación oficial, con «qué cambió y por qué» (cuotas, alineación, noticias).
+  - Pestaña «Auditoría»: sesgos, calibración del favorito, ligas donde peor rinde, acierto y rendimiento de
+    cada tipo de apuesta por clase, riesgo y rango de cuota, CLV y evolución semanal.
+  - Abstención automática: en las competiciones donde el modelo no supera a la referencia simple (30 partidos
+    o más) y no hay cuotas, el veredicto es «NO HAY APUESTA RECOMENDADA».
+  - Córners y tarjetas: las opciones que no pasan la prueba quedan retiradas (plegadas, sin cuota mínima).
+  - Alineaciones: tabla de confirmados, probables, en duda (noticias) y fuera del once oficial, con fuente,
+    hora de consulta y fiabilidad.
+  - Página web más liviana: los partidos a más de 3 días viajan resumidos y su detalle completo va en un
+    segundo archivo cifrado (lejos.bin) que solo se descarga cuando abres uno.
+  - La clave de la página y el token de GitHub ya no se guardan en claro en el navegador.
+  Sigue sin poderse (no hay fuente gratuita autorizada): xG por remate, lesiones y sanciones confirmadas,
+  formación táctica, lectura de Betano. El rendimiento con cuotas reales sigue siendo negativo: el programa
+  informa, no demuestra ganancia.
+  Volver a la versión anterior:   git checkout antes-auditoria-2026-11-22
+
 VERSIÓN 3 · INTELIGENCIA (desde el 20/11/2026)
   Las probabilidades NO cambiaron (mismo modelo y misma ancla a las cuotas). Lo nuevo es cómo se analizan,
   se explican y se muestran:

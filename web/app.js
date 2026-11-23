@@ -67,6 +67,58 @@ async function paqueteWeb() {
   VERSION_PAQUETE = v;
   return PAQUETE;
 }
+// Para que la página abra rápido, los partidos a más de 3 días viajan «livianos» y su detalle completo va en un
+// segundo archivo cifrado (lejos.bin) que solo se descarga cuando abres uno de esos partidos.
+let LEJOS_LISTO = false;
+async function cargarLejos() {
+  if (LEJOS_LISTO || !ESTATICO) return;
+  const r = await fetch("lejos.bin?v=" + encodeURIComponent(VERSION_PAQUETE || Date.now()), { cache: "no-store" });
+  if (!r.ok) throw new Error(r.status);
+  const L = await descifrarPaquete(await r.arrayBuffer(), CLAVE_WEB);
+  (DATOS?.partidos || []).forEach(m => {
+    const p = m._lejos && L[m.id];
+    if (p) for (const k in p) {
+      if (k === "mercados") m.apuesta.mercados = p.mercados;
+      else if (k === "calc") m.pred.calc = p.calc;
+      else m[k] = p[k];
+    }
+    delete m._lejos;
+  });
+  LEJOS_LISTO = true;
+}
+
+// Cofre: la clave de la página y el token de GitHub no se guardan en claro. Se cifran con una llave que el
+// navegador custodia y que no se puede copiar (IndexedDB + WebCrypto). Protege de quien mire el almacenamiento
+// del navegador; no de alguien que use tu sesión abierta.
+const cofre = {
+  async _llave() {
+    const db = await new Promise((ok, mal) => { const r = indexedDB.open("pf_cofre", 1); r.onupgradeneeded = () => r.result.createObjectStore("k"); r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); });
+    let k = await new Promise((ok, mal) => { const q = db.transaction("k").objectStore("k").get("llave"); q.onsuccess = () => ok(q.result); q.onerror = () => mal(q.error); });
+    if (!k) {
+      k = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+      await new Promise((ok, mal) => { const t = db.transaction("k", "readwrite"); t.objectStore("k").put(k, "llave"); t.oncomplete = ok; t.onerror = () => mal(t.error); });
+    }
+    return k;
+  },
+  async guardar(nombre, texto) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await this._llave(), new TextEncoder().encode(texto)));
+    localStorage.setItem("pf_c_" + nombre, btoa(String.fromCharCode(...iv, ...ct)));
+    localStorage.removeItem("pf_" + nombre);              // borra la copia en claro de versiones anteriores
+  },
+  async leer(nombre) {
+    try {
+      const viejo = localStorage.getItem("pf_" + nombre);
+      if (viejo) { await this.guardar(nombre, viejo).catch(() => { }); return viejo; }       // migración
+      const b = localStorage.getItem("pf_c_" + nombre);
+      if (!b) return "";
+      const u = Uint8Array.from(atob(b), c => c.charCodeAt(0));
+      return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: u.slice(0, 12) }, await this._llave(), u.slice(12)));
+    } catch { return ""; }
+  },
+  borrar(nombre) { try { localStorage.removeItem("pf_c_" + nombre); localStorage.removeItem("pf_" + nombre); } catch { } },
+};
+
 async function apiWeb(ruta) {
   if (ruta === "/api/ping") return { ok: true };
   if (ruta === "/api/actualizar") return { iniciado: false, web: true };
@@ -91,7 +143,7 @@ function pantallaClave(error) {
     const pass = $("#acceso-clave").value;
     $("#acceso-msg").textContent = "Abriendo…";
     if (await probarClave(pass)) {
-      try { if ($("#acceso-recordar").checked) localStorage.setItem("pf_clave", pass); } catch { }
+      if ($("#acceso-recordar").checked) cofre.guardar("clave", pass).catch(() => { });      // cifrada, no en claro
       $("#acceso").remove();
       iniciar();
     } else $("#acceso-msg").textContent = "Clave incorrecta. Inténtalo de nuevo.";
@@ -111,7 +163,8 @@ let ACTUALIZANDO_WEB = false, AVISO_WEB = null;
 const FLUJO_WEB = "actualizar.yml";
 const espera = ms => new Promise(r => setTimeout(r, ms));
 const repoWeb = () => PAQUETE?.repo || `${location.hostname.split(".")[0]}/${location.pathname.split("/").filter(Boolean)[0] || ""}`;
-function tokenWeb() { try { return localStorage.getItem("pf_token") || ""; } catch { return ""; } }
+let TOKEN_WEB = null;                         // se lee del cofre la primera vez que hace falta
+const tokenWeb = () => TOKEN_WEB || "";
 async function github(ruta, op = {}) {
   const r = await fetch(`https://api.github.com/repos/${repoWeb()}/actions/${ruta}`, Object.assign({ cache: "no-store" }, op,
     { headers: Object.assign({ Authorization: "Bearer " + tokenWeb(), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
@@ -144,13 +197,15 @@ function pantallaToken(error) {
     ev.preventDefault();
     const t = $("#token-in").value.trim();
     if (t.length < 20) { $("#token-msg").textContent = "Ese texto no parece un token: cópialo completo."; return; }
-    try { localStorage.setItem("pf_token", t); } catch { $("#token-msg").textContent = "Este navegador no deja guardar el token (¿modo privado?)."; return; }
+    TOKEN_WEB = t;
+    cofre.guardar("token", t).catch(() => toast("Este navegador no deja guardar el token: servirá hasta que cierres la página"));
     $("#acceso-token").remove();
     actualizarWeb();
   };
 }
 async function actualizarWeb() {
   if (ACTUALIZANDO_WEB) return toast("Ya hay una actualización en curso");
+  if (TOKEN_WEB === null) TOKEN_WEB = await cofre.leer("token");
   if (!tokenWeb()) return pantallaToken();
   ACTUALIZANDO_WEB = true; AVISO_WEB = null;
   const fase = (t, p) => { ESTADO = Object.assign({}, ESTADO, { corriendo: true, actualizado: new Date().toISOString(), fase: t, progreso: Math.round(p), error: null }); pintarEstado(); };
@@ -186,7 +241,7 @@ async function actualizarWeb() {
   } catch (e) {
     ACTUALIZANDO_WEB = false;
     if ([401, 403, 404].includes(e.codigo)) {           // token vencido, mal copiado o sin el permiso «Actions»
-      try { localStorage.removeItem("pf_token"); } catch { }
+      TOKEN_WEB = ""; cofre.borrar("token");
       pantallaToken(e.codigo === 401 ? "GitHub no reconoce ese token (venció o está mal copiado). Crea uno nuevo." : "Al token le falta el permiso «Actions: Read and write» sobre este proyecto. Crea uno nuevo siguiendo los pasos.");
     } else AVISO_WEB = `No se pudo actualizar ahora: ${e.message || "sin conexión"}. La página sigue con los datos anteriores; vuelve a intentarlo en un minuto.`;
     try { ESTADO = await api("/api/estado"); } catch { ESTADO.corriendo = false; }
@@ -208,6 +263,7 @@ async function cargarDatos() {
   } catch {
     DATOS = null;
   }
+  LEJOS_LISTO = false;
   LIGAS = {}; ORDEN = {};
   (DATOS?.ligas || []).forEach((l, i) => { LIGAS[l.codigo] = l; ORDEN[l.codigo] = i; });
   ULTIMA_CARGA = DATOS?.generado || null;
@@ -413,7 +469,7 @@ function filaPartido(m) {
     <div class="probs">
       <div class="probs-num"><span class="l">${pct(p.pH)}</span><span class="x">${pct(p.pD)}</span><span class="v">${pct(p.pA)}</span></div>
       <div class="barra3"><div class="l" style="width:${p.pH * 100}%"></div><div class="x" style="width:${p.pD * 100}%"></div><div class="v" style="width:${p.pA * 100}%"></div></div>
-      <div class="iconos">${ac === null ? "" : `<span class="acierto-badge ${ac ? "si" : "no"}">${ac ? "ACERTÓ" : "FALLÓ"}</span>`}${m.alineacion?.estado === "confirmada" ? `<span class="xi-badge" title="Alineación confirmada">XI</span>` : ""}${iconos}</div>
+      <div class="iconos">${ac === null ? "" : `<span class="acierto-badge ${ac ? "si" : "no"}">${ac ? "ACERTÓ" : "FALLÓ"}</span>`}${m.alineacion?.estado === "confirmada" ? `<span class="xi-badge" title="Alineación confirmada">XI</span>` : ""}${window.PF_iconos?.(m) || ""}${iconos}</div>
     </div>
     <div class="equipo visita">${logo(m.a.logo, m.a.n)}<div class="col"><span class="nombre" title="${esc(m.a.n)}">${esc(m.a.n)}</span>${forma(m.ctx?.a?.forma)}</div>${goles("a")}</div>
     <div class="extra extra-col">
@@ -454,6 +510,11 @@ function pintarPartidos() {
 function abrirDetalle(id) {
   const m = DATOS.partidos.find(x => x.id === id);
   if (!m) return;
+  if (m._lejos) {            // página web: el detalle de los partidos lejanos se descarga solo cuando se pide
+    toast("Cargando el detalle de este partido…");
+    cargarLejos().then(() => abrirDetalle(id)).catch(() => toast("No se pudo cargar el detalle: revisa tu internet"));
+    return;
+  }
   $("#detalle").innerHTML = htmlDetalle(m);
   $("#detalle").classList.add("abierto");
   $("#velo").classList.add("abierto");
@@ -829,7 +890,13 @@ function filasExtra(lista, pref) {
 function htmlExtras(m) {
   const x = m.extras;
   if (!x || m.estado !== "pre") return "";
-  const tabla = (lista, pref) => `<table class="t" style="margin-top:6px"><tr><th>Opción</th><th class="num">Prob.</th><th class="num">Justa</th><th class="num">Mínima</th><th>Tu cuota</th><th></th></tr>${filasExtra(lista, pref)}</table>`;
+  // primero las opciones que pasaron la prueba de calibración; las que no, quedan retiradas (plegadas) y sin cuota mínima
+  const tabla = (lista, pref) => {
+    const cab = `<tr><th>Opción</th><th class="num">Prob.</th><th class="num">Justa</th><th class="num">Mínima</th><th>Tu cuota</th><th></th></tr>`;
+    const ok = lista.filter(f => !f.no_calibrado), mal = lista.filter(f => f.no_calibrado);
+    return (ok.length ? `<table class="t" style="margin-top:6px">${cab}${filasExtra(ok, pref)}</table>` : `<p class="nota">Ninguna opción de este mercado pasó la prueba con partidos pasados: aquí no se recomienda apostar.</p>`)
+      + (mal.length ? `<details class="todas"><summary>Ver ${mal.length} opciones retiradas por no pasar la prueba</summary><table class="t">${cab}${filasExtra(mal, pref)}</table></details>` : "");
+  };
   let h = `<div class="seccion"><h3>Córners, tarjetas y tiempos <small>con los nombres de mercado de Betano</small></h3>`;
   if (x.corners) {
     const c = x.corners;
@@ -957,6 +1024,7 @@ P(local) = Σ P(i>j)   P(empate) = Σ P(i=j)   P(visita) = Σ P(i<j)
 Partidos efectivos en la muestra: local ${num(c.n_local, 1)}, visita ${num(c.n_visita, 1)} (vida media ${DATOS.vida_media} días)
 Media de su liga hacia la que se regresa A: local ${num(c.media_liga_A_local, 3)}, visita ${num(c.media_liga_A_visita, 3)}
 Diferencia de altitud que sube el visitante: ${num(c.dalt_km * 1000, 0)} m
+Factor de goles reciente (probado semana a semana; 1 = sin corrección): ×${num(c.factor_goles ?? 1, 3)} a ambos equipos
 Factores acotados aplicados (estimados con los datos, R19):
 ${facs || "  · ninguno"}${c.mezcla ? `
 
@@ -1270,6 +1338,15 @@ function pintarAyuda() {
     ["D25", "Perfil de errores", "No disponible", "Requiere datos de eventos por jugador que las fuentes gratuitas no dan."],
   ];
   $("#v-ayuda").innerHTML = `<h2>Cómo funciona</h2>
+  <h3>Novedades de la versión 3.1 (auditoría)</h3>
+  <ul>
+    <li><b>Necesidad en la tabla:</b> qué se juega cada equipo (título, copas, descenso), con probabilidad simulada en las ligas de ida y vuelta, y si necesita ganar o le sirve el empate. Es contexto: necesitar ganar no es tener más probabilidad de ganar.</li>
+    <li><b>Tres momentos:</b> el pronóstico se guarda 24-48 h antes, 3-6 h antes y con la alineación oficial, con qué cambió y por qué.</li>
+    <li><b>Pestaña Auditoría:</b> cómo le fue de verdad al programa: sesgos, calibración, ligas donde falla, rendimiento por tipo de apuesta y CLV.</li>
+    <li><b>Factor de goles:</b> el modelo se quedaba corto en goles; ahora se corrige con lo ocurrido en las 10 semanas anteriores, solo si mejora la prueba. Los empates no se tocaron porque la prueba grande no mostró sesgo.</li>
+    <li><b>Abstención:</b> en competiciones donde el modelo no supera a la referencia simple y no hay cuotas, el veredicto es «no hay apuesta recomendada».</li>
+    <li><b>Córners y tarjetas:</b> las opciones que no pasan la prueba quedan retiradas (plegadas).</li>
+  </ul>
   <h3>Novedades de la versión 3 (inteligencia)</h3>
   <ul>
     <li><b>Panel:</b> lo que pasa hoy de un vistazo: partidos, simulaciones, alineaciones pendientes, alertas, movimiento de cuotas y las mejores oportunidades (ordenadas por calidad de la evidencia, no por ganancia).</li>
@@ -1368,8 +1445,8 @@ function iniciar() {
   cargarDatos().then(consultarEstado);
 }
 if (ESTATICO) {
-  let guardada = null;
-  try { guardada = localStorage.getItem("pf_clave"); } catch { }
-  if (guardada) probarClave(guardada).then(ok => ok ? iniciar() : pantallaClave(true));
-  else pantallaClave(false);
+  cofre.leer("clave").then(guardada => {
+    if (guardada) probarClave(guardada).then(ok => ok ? iniciar() : pantallaClave(true));
+    else pantallaClave(false);
+  });
 } else iniciar();

@@ -467,3 +467,12 @@ table.cmp td.gana { background: rgba(34, 211, 238, .07); }
   .hero .der { margin-left: 0; text-align: left; }
 }
 @media (max-width: 520px) { .tuberia { grid-template-columns: 1fr; } .fila-mini { grid-template-columns: 42px minmax(0, 1fr) auto; } .fila-mini .barra3 { display: none; } }
+
+/* ---------- v3.1 · necesidad en la tabla ---------- */
+.nec-nivel { font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; letter-spacing: .4px; border: 1px solid var(--borde); color: var(--suave); white-space: nowrap; }
+.nec-nivel.n-decisivo { color: var(--rojo); border-color: rgba(251, 113, 133, .5); background: rgba(251, 113, 133, .10); }
+.nec-nivel.n-importante { color: var(--amarillo); border-color: rgba(251, 191, 36, .5); background: rgba(251, 191, 36, .10); }
+.nec-nivel.n-sin-urgencia { color: var(--visita); border-color: rgba(167, 139, 250, .5); background: rgba(167, 139, 250, .10); }
+.obj { margin-top: 8px; display: grid; gap: 3px; }
+.obj-cab { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+.obj-cab b { color: var(--acento); }

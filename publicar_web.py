@@ -55,6 +55,50 @@ def leer_prompt(clave):
     return ""
 
 
+HORAS_CERCA = 72          # los partidos que empiezan después de este plazo viajan «livianos»
+PESADOS = ("extras", "matriz", "noticias", "necesidad", "momentos", "cambios", "disciplina", "clima")
+
+
+def aligerar(datos, ahora=None):
+    """Para que la página abra rápido: a los partidos lejanos se les quita el detalle pesado, que va aparte.
+
+    Devuelve {id: detalle}. La app descarga ese segundo archivo (lejos.bin) solo cuando abres uno de esos partidos.
+    En la lista y el panel siguen viéndose igual: probabilidades, las 3 apuestas, clase de riesgo y veredicto."""
+    ahora = ahora or dt.datetime.now(dt.timezone.utc)
+    lejos = {}
+    for m in datos.get("partidos", []):
+        if m.get("estado") != "pre":
+            continue
+        inicio = dt.datetime.fromisoformat(m["fecha"].replace("Z", "+00:00"))
+        if (inicio - ahora).total_seconds() <= HORAS_CERCA * 3600:
+            continue
+        p = {k: m.pop(k) for k in PESADOS if m.get(k) is not None}
+        ap = m.get("apuesta")
+        if ap and ap.get("mercados"):
+            usados = {x["cod"] for x in (ap.get("perfiles") or {}).values()}
+            p["mercados"] = ap["mercados"]
+            ap["mercados"] = [f for f in ap["mercados"] if f["cod"] in usados]
+        if m.get("alineacion"):
+            p["alineacion"] = m["alineacion"]
+            m["alineacion"] = {"estado": m["alineacion"].get("estado")}
+        if m.get("sim"):
+            p["sim"] = m["sim"]
+            m["sim"] = {"n": m["sim"]["n"], "estabilidad": m["sim"]["estabilidad"]}
+        if m.get("intel"):
+            it = p["intel"] = m["intel"]
+            m["intel"] = {"veredicto": it["veredicto"], "puntaje": it.get("puntaje"), "discrepancias": [], "riesgos": [],
+                          "perfiles": {k: {q: x.get(q) for q in ("cod", "clase", "evidencia", "motivo")}
+                                       for k, x in (it.get("perfiles") or {}).items()}}
+        if m.get("ctx"):
+            c = p["ctx"] = m["ctx"]
+            m["ctx"] = {s: {"forma": (c.get(s) or {}).get("forma")} for s in ("h", "a")}
+        if (m.get("pred") or {}).get("calc") is not None:
+            p["calc"] = m["pred"].pop("calc")
+        m["_lejos"] = True
+        lejos[m["id"]] = p
+    return lejos
+
+
 def main():
     clave = os.environ.get("CLAVE_PAGINA", "").strip()     # sin espacios ni saltos de línea invisibles
     if len(clave) < 12:
@@ -73,6 +117,7 @@ def main():
     except Exception:
         estado = {}
     version = estado.get("ultima_ok") or datos.get("generado") or dt.datetime.now(dt.timezone.utc).isoformat()
+    lejos = aligerar(datos)
     # «repo» (dueño/proyecto, lo da GitHub) le dice al botón «Actualizar ahora» a qué flujo llamar; no es secreto
     paquete = {"datos": datos, "estado": estado, "prompt": leer_prompt(clave),
                "repo": os.environ.get("GITHUB_REPOSITORY", "")}
@@ -89,9 +134,13 @@ def main():
     index = index.replace('<script src="app.js"></script>',
                           f'<script>window.PF_ESTATICO = true;</script>\n<script src="app.js?v={v}"></script>')
     index = index.replace('<script src="panel.js"></script>', f'<script src="panel.js?v={v}"></script>')
+    index = index.replace('<script src="auditoria.js"></script>', f'<script src="auditoria.js?v={v}"></script>')
     index = index.replace('href="estilos.css"', f'href="estilos.css?v={v}"')
     (SALIDA / "index.html").write_text(index, encoding="utf-8")
     (SALIDA / "datos.bin").write_bytes(cifrar(crudo, clave))
+    crudo_lejos = gzip.compress(json.dumps(lejos, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6)
+    (SALIDA / "lejos.bin").write_bytes(cifrar(crudo_lejos, clave))
+    print(f"Detalle de {len(lejos)} partidos lejanos aparte: lejos.bin {len(crudo_lejos) / 1e6:.1f} MB comprimido")
     (SALIDA / "version.txt").write_text(version, encoding="utf-8")
     (SALIDA / ".nojekyll").write_text("", encoding="utf-8")
     (SALIDA / "robots.txt").write_text("User-agent: *\nDisallow: /\n", encoding="utf-8")

@@ -406,6 +406,9 @@ def lambdas_partido(P, D, e, cov=None):
     mezcla = None
     if getattr(P, "conj", None) is not None:      # ligas de nivel 3-4: conjunto con memoria corta + Elo
         lh, la, mezcla = P.conj.ajustar(D, e, lh, la, P.rho, lambdas_partido, matriz, resumen_matriz)
+    # factor de goles reciente (motor/goles.py): solo vale distinto de 1 si pasó la prueba semana a semana
+    fg = getattr(P, "factor_goles", 1.0)
+    lh, la = lh * fg, la * fg
     return {
         "hi": hi, "ai": ai, "c": c, "X": X, "Hh": Hh, "Ha": Ha, "th": th, "td": td, "eh": eh, "ea": ea,
         "lh": lh, "la": la, "mezcla": mezcla,
@@ -468,7 +471,7 @@ def predecir(P, D, e, rng, sims=SIMULACIONES_INTERVALO, matrices=None, factores=
         "o35": round(float(o["o3.5"][0]), 4), "btts": round(float(btts[0]), 4),
         "top": [[i, j, round(p, 4)] for i, j, p in plano[:5]],
         "dist_goles": dist_goles, "conf": conf,
-        "calc": _transparencia(P, D, L),
+        "calc": dict(_transparencia(P, D, L), factor_goles=round(float(getattr(P, "factor_goles", 1.0)), 4)),
         "solo_modelo": solo_modelo,
     }
 

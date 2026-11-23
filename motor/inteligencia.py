@@ -185,7 +185,18 @@ def riesgos_partido(item, carga):
             out.append(f"{item[s]['n']} jugó {carga[s]['p8']} partidos en los últimos 8 días (posible fatiga)")
     if carga.get("viaje_km", 0) >= 2500:
         out.append(f"{item['a']['n']} viaja cerca de {carga['viaje_km']:,} km".replace(",", " "))
-    return out[:7]
+    # necesidad en la tabla (motor/necesidad.py): es contexto, no cambia la probabilidad
+    for s in ("h", "a"):
+        nec = (item.get("necesidad") or {}).get(s) or {}
+        if nec.get("otra_liga"):
+            continue
+        if nec.get("nivel") == "sin urgencia":
+            out.append(f"{item[s]['n']} no tiene objetivos en disputa en la tabla: puede rotar o bajar la intensidad "
+                       f"(no confirmado)")
+        elif nec.get("nivel") == "decisivo":
+            out.append(f"partido decisivo para {item[s]['n']} («{nec.get('principal')}»): la urgencia sube la "
+                       f"iniciativa, pero también el riesgo atrás")
+    return out[:8]
 
 
 # ------------------------------------------------------------------ discrepancias
@@ -377,6 +388,13 @@ def analizar(item, e, env, tope=0.25):
     else:
         veredicto = {"cod": "condicional", "txt": "Solo si Betano paga la cuota mínima o más",
                      "motivo": "con una cuota menor a la mínima el valor esperado es negativo"}
+    # abstención medida por la auditoría: ligas donde, sin cuotas, el modelo no supera a la referencia simple
+    if ap and ap.get("base") == "modelo" and e.get("lg") in (env.get("abstener") or ()):
+        motivo = ("en esta competición el modelo no ha superado a la referencia simple en los partidos ya jugados "
+                  "y no hay cuotas que lo corrijan")
+        veredicto = {"cod": "no", "txt": "NO HAY APUESTA RECOMENDADA", "motivo": motivo}
+        for x in perfiles.values():
+            x["clase"], x["motivo"] = "sin_valor", motivo
     item["intel"] = {
         "veredicto": veredicto, "perfiles": perfiles, "claves": claves, "carga": carga,
         "riesgos": riesgos_partido(item, carga), "discrepancias": discrepancias(item),
