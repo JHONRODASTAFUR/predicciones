@@ -169,29 +169,39 @@ async function github(ruta, op = {}) {
   const r = await fetch(`https://api.github.com/repos/${repoWeb()}/actions/${ruta}`, Object.assign({ cache: "no-store" }, op,
     { headers: Object.assign({ Authorization: "Bearer " + tokenWeb(), Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" },
       op.body ? { "Content-Type": "application/json" } : {}) }));
-  if (!r.ok) throw Object.assign(new Error("GitHub " + r.status), { codigo: r.status });
+  if (!r.ok) {
+    let detalle = "";                                   // lo que responde GitHub, para explicar el fallo sin adivinar
+    try { detalle = (await r.json()).message || ""; } catch { }
+    throw Object.assign(new Error("GitHub " + r.status), { codigo: r.status, detalle });
+  }
   return r.status === 204 ? null : r.json();
 }
 async function traerUltimoWeb(mensaje) {
   try { PAQUETE = null; await cargarDatos(); ESTADO = await api("/api/estado"); pintarEstado(); toast(mensaje); }
   catch { toast("No se pudo descargar: revisa tu internet"); }
 }
-function pantallaToken(error) {
+// `error`: por qué GitHub rechazó el intento anterior. `reintentar`: el token guardado es válido y solo le falta un
+// permiso, así que se puede corregir en GitHub y volver a probar sin pegarlo otra vez.
+function pantallaToken(error, reintentar) {
   if ($("#acceso-token")) return;
-  document.body.insertAdjacentHTML("beforeend", `<div class="acceso" id="acceso-token"><form class="acceso-caja" id="token-form" style="width:min(520px,100%)">
+  const repo = esc(repoWeb().split("/")[1] || "predicciones");
+  const crear = "https://github.com/settings/personal-access-tokens/new?name=Actualizar+predicciones&description=Boton+Actualizar+ahora+de+mi+pagina&expires_in=365&actions=write";
+  document.body.insertAdjacentHTML("beforeend", `<div class="acceso" id="acceso-token" style="overflow:auto"><form class="acceso-caja" id="token-form" style="width:min(560px,100%)">
     <h2>Activar «Actualizar ahora»</h2>
-    <p class="nota">Este botón le pide a GitHub una actualización completa (2 a 4 minutos). Para eso necesita un permiso de tu cuenta de GitHub, llamado <b>token</b>. Se crea una sola vez y se guarda solo en este dispositivo.</p>
-    <ol class="nota" style="padding-left:18px;margin:0;display:grid;gap:4px">
-      <li>Abre <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">github.com → crear token</a> con tu cuenta.</li>
-      <li>Nombre: «Actualizar predicciones». Caducidad: la más larga que te deje.</li>
-      <li>Repository access: <b>Only select repositories</b> → <b>${esc(repoWeb().split("/")[1] || "predicciones")}</b>.</li>
-      <li>Permissions → Repository permissions → <b>Actions: Read and write</b>. Nada más.</li>
-      <li>Pulsa <b>Generate token</b>, cópialo y pégalo aquí.</li></ol>
-    <input type="password" id="token-in" autocomplete="off" placeholder="github_pat_…" required>
-    <button class="boton primario" type="submit">Guardar y actualizar</button>
+    ${error ? `<div class="aviso error" style="margin:0"><b>GitHub rechazó el token.</b> ${esc(error)}</div>` : `<p class="nota">Este botón le pide a GitHub una actualización completa (2 a 5 minutos). Para eso necesita un permiso de tu cuenta de GitHub, llamado <b>token</b>. Se crea una sola vez y se guarda solo en este dispositivo.</p>`}
+    <ol class="nota" style="padding-left:18px;margin:0;display:grid;gap:6px">
+      <li>${reintentar ? `Abre <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">tu lista de tokens en GitHub</a> y pulsa el nombre del que creaste para corregirlo` : `Abre <a href="${crear}" target="_blank" rel="noopener noreferrer">github.com → crear token</a> con tu cuenta`} (si ya tienes uno, <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">está en tu lista de tokens</a>).</li>
+      <li><b>Expiration:</b> elige la fecha más lejana. Si dejas 30 días tendrás que repetir esto cada mes.</li>
+      <li><b>Repository access:</b> marca <b>Only select repositories</b> y elige <b>${repo}</b>. Si se queda en «Public repositories», no funciona.</li>
+      <li><b>Permissions → Repository permissions:</b> busca <b>Actions</b> (si hace falta, pulsa «Add permissions» y márcalo) y cambia su nivel de «Read-only» a <b>Read and write</b>. Es el fallo más común.</li>
+      <li>Pulsa <b>${reintentar ? "Update" : "Generate token"}</b>${reintentar ? " para guardar los cambios" : ", copia el texto completo (empieza por <b>github_pat_</b>) y pégalo aquí"}.</li></ol>
+    ${reintentar ? `<button class="boton primario" type="button" id="token-reintentar">Ya lo corregí en GitHub: reintentar</button>` : ""}
+    <input type="password" id="token-in" autocomplete="off" placeholder="${reintentar ? "o pega aquí un token nuevo (github_pat_…)" : "github_pat_…"}"${reintentar ? "" : " required"}>
+    <button class="boton${reintentar ? "" : " primario"}" type="submit">${reintentar ? "Guardar el token nuevo y actualizar" : "Guardar y actualizar"}</button>
     <button class="boton" type="button" id="token-solo">Ahora no: solo traer lo último publicado</button>
-    <p class="nota" id="token-msg">${error ? esc(error) : "Ese token solo sirve para pedir actualizaciones de este proyecto: no da acceso a tu cuenta ni a tu código."}</p></form></div>`);
-  $("#token-in").focus();
+    <p class="nota" id="token-msg">Ese token solo sirve para pedir actualizaciones de este proyecto: no da acceso a tu cuenta ni a tu código.</p></form></div>`);
+  if (!reintentar) $("#token-in").focus();
+  if (reintentar) $("#token-reintentar").onclick = () => { $("#acceso-token").remove(); actualizarWeb(); };
   $("#token-solo").onclick = () => { $("#acceso-token").remove(); traerUltimoWeb("Datos al día con lo último publicado"); };
   $("#token-form").onsubmit = ev => {
     ev.preventDefault();
@@ -240,9 +250,12 @@ async function actualizarWeb() {
     await traerUltimoWeb("Listo: datos actualizados y partidos analizados");
   } catch (e) {
     ACTUALIZANDO_WEB = false;
-    if ([401, 403, 404].includes(e.codigo)) {           // token vencido, mal copiado o sin el permiso «Actions»
+    const dijo = e.detalle ? ` GitHub respondió: «${e.detalle}».` : "";
+    if (e.codigo === 401) {                             // token mal copiado, vencido o de otra cuenta: no sirve, se descarta
       TOKEN_WEB = ""; cofre.borrar("token");
-      pantallaToken(e.codigo === 401 ? "GitHub no reconoce ese token (venció o está mal copiado). Crea uno nuevo." : "Al token le falta el permiso «Actions: Read and write» sobre este proyecto. Crea uno nuevo siguiendo los pasos.");
+      pantallaToken(`No lo reconoce: casi siempre es porque se copió incompleto o ya venció.${dijo} Cópialo entero otra vez o genera uno nuevo.`);
+    } else if (e.codigo === 403 || e.codigo === 404) {  // token válido pero sin permiso: se conserva para poder reintentar
+      pantallaToken(`El token es válido, pero no tiene permiso para lanzar la actualización.${dijo} Le falta una de estas dos cosas: que en «Repository access» esté elegido este proyecto, o que el permiso «Actions» diga «Read and write» y no «Read-only». Corrígelo en ese mismo token (pasos de abajo) y pulsa «reintentar»: no hace falta crear otro.`, true);
     } else AVISO_WEB = `No se pudo actualizar ahora: ${e.message || "sin conexión"}. La página sigue con los datos anteriores; vuelve a intentarlo en un minuto.`;
     try { ESTADO = await api("/api/estado"); } catch { ESTADO.corriendo = false; }
     pintarEstado();
