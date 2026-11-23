@@ -81,6 +81,19 @@ except Exception:
 INFO_LIGA = {c: {"codigo": c, "nombre": n, "pais": p, "nivel": nv, "tipo": t} for c, n, p, nv, t in LIGAS}
 
 
+def _poner_logos(ligas):
+    """Logo oficial de cada competición (lo publica ESPN; se guarda en ligas_espn.json). Solo presentación."""
+    for l in ligas:
+        if l.get("logo") and l["codigo"] in INFO_LIGA:
+            INFO_LIGA[l["codigo"]]["logo"] = l["logo"]
+
+
+try:
+    _poner_logos(_json.loads(ARCHIVO_LIGAS_ESPN.read_text(encoding="utf-8")).get("ligas", []))
+except Exception:
+    pass
+
+
 def agregar_ligas(ligas):
     """Suma (sin reiniciar) las competiciones descubiertas en ESPN que aún no están en la lista."""
     for l in ligas:
@@ -88,6 +101,7 @@ def agregar_ligas(ligas):
             LIGAS.append((l["codigo"], l["nombre"], l["pais"], 4, l["tipo"]))
             INFO_LIGA[l["codigo"]] = {"codigo": l["codigo"], "nombre": l["nombre"], "pais": l["pais"], "nivel": 4,
                                       "tipo": l["tipo"]}
+    _poner_logos(ligas)
 
 # Copas que pueden provocar rotaciones en la liga local (D24.6)
 COPAS_PRIORITARIAS = {"uefa.champions", "uefa.europa", "uefa.europa.conf",

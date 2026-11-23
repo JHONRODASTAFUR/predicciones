@@ -3,37 +3,80 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Predicciones Fútbol</title>
-<link rel="icon" href="icono.png">
+<meta name="theme-color" content="#070D1A">
+<title>Predicciones Fútbol · por Rodas</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="icono.png">
 <link rel="stylesheet" href="estilos.css">
+<link rel="stylesheet" href="marca.css">
 </head>
-<body>
+<body data-vista="panel">
+<!-- Identidad R de Rodas: el logo y los iconos son dibujos propios (SVG), se reutilizan con <use>. -->
+<svg style="position:absolute;width:0;height:0" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="rg" x1="8" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#078BFF"/><stop offset="1" stop-color="#20D8E8"/>
+    </linearGradient>
+    <symbol id="logo-r" viewBox="0 0 64 64">
+      <g transform="translate(5.6 0) skewX(-10)">
+        <path fill="url(#rg)" fill-rule="evenodd" d="M15 10H37.5C46.6 10 52 15.2 52 23.2C52 30 48.4 34.5 42.6 36.3L52.5 54H40.6L32 37.8H26V54H15ZM26 19.4V28.6H36.6C40 28.6 41.7 26.8 41.7 24C41.7 21.2 40 19.4 36.6 19.4Z"/>
+        <path fill="#20D8E8" opacity=".9" d="M5 44H11.5L9.4 54H2.9Z"/>
+      </g>
+    </symbol>
+    <g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <symbol id="i-panel" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v4h-7zM13 11h7v9h-7zM4 14h7v6H4z"/></symbol>
+      <symbol id="i-partidos" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.6l4.2 3-1.6 4.9H9.4l-1.6-4.9zM12 3v4.6M20.5 9.3l-4.3 1.3M17.3 19.2l-2.7-3.7M6.7 19.2l2.7-3.7M3.5 9.3l4.3 1.3"/></symbol>
+      <symbol id="i-comparar" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h13M17 12l4 4-4 4M21 16H8"/></symbol>
+      <symbol id="i-combinada" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5zM3 12.5l9 5 9-5M3 17l9 5 9-5"/></symbol>
+      <symbol id="i-banca" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.500 5H18v4M3 7.500v9A2.500 2.500 0 0 0 5.500 19H20a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1H5.500A2.500 2.500 0 0 1 3 7.500zM16.500 14h.01"/></symbol>
+      <symbol id="i-auditoria" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.600-3.300 8-8 9-4.700-1-8-4.400-8-9V6zM8.500 12l2.500 2.500 4.500-5"/></symbol>
+      <symbol id="i-resultados" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12.400l2.800 2.800L16 9.600"/></symbol>
+      <symbol id="i-tablas" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.500"/><path d="M3 10h18M3 15h18M9 4v16"/></symbol>
+      <symbol id="i-modelo" viewBox="0 0 24 24"><path d="M4 4v16h16M7.500 15.500l4-4.500 3 3 5-6.500"/></symbol>
+      <symbol id="i-ayuda" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.600 9.400a2.500 2.500 0 1 1 3.600 2.300c-.800.400-1.200 1-1.200 1.800M12 17h.01"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-actualizar" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.300-4.300L4 8.500M4 4v4.500h4.500M4 13a8 8 0 0 0 14.300 4.300L20 15.500M20 20v-4.500h-4.500"/></symbol>
+      <symbol id="i-buscar" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.500"/><path d="M16 16l4.500 4.500"/></symbol>
+    </g>
+  </defs>
+</svg>
+
 <header>
-  <div class="marca">
-    <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="14" fill="#e7ecf6"/><path d="M16 8.5l5.2 3.8-2 6.1h-6.4l-2-6.1z" fill="#0a0f1c"/><path d="M16 2v6.5M21.2 12.3l6.1-2.3M19.2 18.4l3.9 5.3M12.8 18.4l-3.9 5.3M10.8 12.3l-6.1-2.3" stroke="#0a0f1c" stroke-width="1.6"/></svg>
-    Predicciones Fútbol
+  <div class="marca" title="Predicciones Fútbol, por Rodas">
+    <svg class="marca-r" viewBox="0 0 64 64" role="img" aria-label="R de Rodas"><use href="#logo-r"/></svg>
+    <span class="marca-txt"><b>Predicciones <i>Fútbol</i></b><small>por Rodas · análisis de fútbol</small></span>
   </div>
-  <nav id="nav">
-    <button data-vista="panel" class="activo">Panel</button>
-    <button data-vista="partidos">Partidos</button>
-    <button data-vista="comparar">Comparar</button>
-    <button data-vista="combinada">Combinadas</button>
-    <button data-vista="banca">Mi banca</button>
-    <button data-vista="auditoria">Auditoría</button>
-    <button data-vista="resultados">Resultados y aciertos</button>
-    <button data-vista="tablas">Tablas</button>
-    <button data-vista="modelo">Modelo</button>
-    <button data-vista="ayuda">Cómo funciona</button>
+  <button class="menu-btn" id="menu-btn" type="button" aria-label="Abrir o cerrar el menú" aria-expanded="false" aria-controls="nav"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
+  <nav id="nav" aria-label="Secciones">
+    <button data-vista="panel" class="activo" aria-current="page"><svg class="ni" aria-hidden="true"><use href="#i-panel"/></svg><span>Panel</span></button>
+    <button data-vista="partidos"><svg class="ni" aria-hidden="true"><use href="#i-partidos"/></svg><span>Partidos</span></button>
+    <button data-vista="comparar"><svg class="ni" aria-hidden="true"><use href="#i-comparar"/></svg><span>Comparar</span></button>
+    <button data-vista="combinada"><svg class="ni" aria-hidden="true"><use href="#i-combinada"/></svg><span>Combinadas</span></button>
+    <button data-vista="banca"><svg class="ni" aria-hidden="true"><use href="#i-banca"/></svg><span>Mi banca</span></button>
+    <button data-vista="auditoria"><svg class="ni" aria-hidden="true"><use href="#i-auditoria"/></svg><span>Auditoría</span></button>
+    <button data-vista="resultados" title="Resultados y aciertos" aria-label="Resultados y aciertos"><svg class="ni" aria-hidden="true"><use href="#i-resultados"/></svg><span>Resultados</span></button>
+    <button data-vista="tablas"><svg class="ni" aria-hidden="true"><use href="#i-tablas"/></svg><span>Tablas</span></button>
+    <button data-vista="modelo"><svg class="ni" aria-hidden="true"><use href="#i-modelo"/></svg><span>Modelo</span></button>
+    <button data-vista="ayuda"><svg class="ni" aria-hidden="true"><use href="#i-ayuda"/></svg><span>Cómo funciona</span></button>
   </nav>
   <div class="estado">
-    <span class="pastilla" id="pastilla"><span class="punto" id="punto"></span><span id="estado-txt">Cargando…</span>
+    <span class="pastilla" id="pastilla" role="status"><span class="punto" id="punto"></span><span id="estado-txt">Cargando…</span>
       <span class="barra-progreso" id="barra" hidden><div id="barra-in" style="width:0"></div></span></span>
-    <button class="boton" id="btn-actualizar" title="Descargar datos nuevos y recalcular">Actualizar ahora</button>
+    <button class="boton primario" id="btn-actualizar" title="Descargar datos nuevos y recalcular"><svg class="ni" aria-hidden="true"><use href="#i-actualizar"/></svg><span>Actualizar ahora</span></button>
   </div>
 </header>
 
 <main>
   <div id="avisos"></div>
+
+  <section class="banner" id="banner" aria-label="Predicciones de fútbol">
+    <div class="banner-txt">
+      <p class="banner-sup">Rodas · análisis de fútbol</p>
+      <h1>Predicciones <span>de fútbol</span></h1>
+      <p>Estadísticas, análisis y probabilidades calibradas</p>
+    </div>
+    <svg class="banner-r" viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-r"/></svg>
+  </section>
 
   <section class="vista activa" id="v-panel"></section>
   <section class="vista" id="v-comparar"></section>
@@ -42,17 +85,19 @@
   <section class="vista" id="v-auditoria"></section>
 
   <section class="vista" id="v-partidos">
-    <div class="barra-herr">
-      <div class="chips" id="dias"></div>
-      <input class="buscar" id="buscar" type="search" placeholder="Buscar equipo…">
-      <select id="filtro-liga"></select>
-      <label class="interruptor"><input type="checkbox" id="solo-dest"> Solo destacadas</label>
-      <label class="interruptor" title="Más probable: aciertas más seguido, pero paga poco. Mayor pago: aciertas menos, pero paga más.">Apuesta:
-        <select id="perfil">
-          <option value="conservador">Más probable</option>
-          <option value="equilibrado">Recomendada</option>
-          <option value="arriesgado">Mayor pago</option>
-        </select></label>
+    <div class="barra-herr filtros">
+      <div class="chips" id="dias" role="group" aria-label="Fechas"></div>
+      <div class="filtros-fila">
+        <label class="campo-buscar"><svg aria-hidden="true"><use href="#i-buscar"/></svg><input class="buscar" id="buscar" type="search" placeholder="Buscar equipo…" aria-label="Buscar equipo"></label>
+        <select id="filtro-liga" aria-label="Liga"></select>
+        <label class="interruptor"><input type="checkbox" id="solo-dest"> Solo destacadas</label>
+        <label class="interruptor" title="Más probable: aciertas más seguido, pero paga poco. Mayor pago: aciertas menos, pero paga más.">Apuesta:
+          <select id="perfil">
+            <option value="conservador">Más probable</option>
+            <option value="equilibrado">Recomendada</option>
+            <option value="arriesgado">Mayor pago</option>
+          </select></label>
+      </div>
     </div>
     <div id="lista"></div>
   </section>
@@ -61,23 +106,31 @@
     <h2>Aciertos del programa</h2>
     <p class="nota">Cada predicción se guarda <b>antes</b> del partido y se compara con el resultado real (D24.17). Así se mide si las probabilidades están bien calibradas.</p>
     <div class="kpis" id="kpis-hist"></div>
-    <div class="barra-herr"><select id="filtro-hist"></select></div>
+    <div class="barra-herr"><select id="filtro-hist" aria-label="Liga"></select></div>
     <div id="tabla-hist"></div>
   </section>
 
   <section class="vista" id="v-tablas">
-    <div class="barra-herr"><select id="sel-tabla"></select></div>
+    <div class="barra-herr"><select id="sel-tabla" aria-label="Competición"></select></div>
     <div id="tabla-pos"></div>
   </section>
 
   <section class="vista" id="v-modelo"></section>
 
   <section class="vista ayuda" id="v-ayuda"></section>
+
+  <footer class="pie">
+    <div class="pie-item"><svg aria-hidden="true"><use href="#i-modelo"/></svg><div><b>Análisis con datos reales</b><span>Cada dato lleva su fuente y su hora</span></div></div>
+    <div class="pie-item"><svg aria-hidden="true"><use href="#i-auditoria"/></svg><div><b>Probabilidades auditadas</b><span>Se comparan con lo que pasó de verdad</span></div></div>
+    <div class="pie-item"><svg aria-hidden="true"><use href="#i-actualizar"/></svg><div><b>Actualización automática</b><span>Cada hora y con alineaciones oficiales</span></div></div>
+    <div class="pie-lema"><span>¡Apuesta con <b>inteligencia</b>!</span><svg viewBox="0 0 64 64" aria-hidden="true"><use href="#logo-r"/></svg></div>
+    <p class="pie-legal">Son probabilidades, no certezas: ningún modelo garantiza ganancias. Solo mayores de 18 años.</p>
+  </footer>
 </main>
 
 <div class="velo" id="velo"></div>
 <aside class="detalle" id="detalle" aria-live="polite"></aside>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status"></div>
 <script src="app.js"></script>
 <script src="panel.js"></script>
 <script src="auditoria.js"></script>

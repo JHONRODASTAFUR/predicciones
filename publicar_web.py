@@ -136,6 +136,7 @@ def main():
     index = index.replace('<script src="panel.js"></script>', f'<script src="panel.js?v={v}"></script>')
     index = index.replace('<script src="auditoria.js"></script>', f'<script src="auditoria.js?v={v}"></script>')
     index = index.replace('href="estilos.css"', f'href="estilos.css?v={v}"')
+    index = index.replace('href="marca.css"', f'href="marca.css?v={v}"')
     (SALIDA / "index.html").write_text(index, encoding="utf-8")
     (SALIDA / "datos.bin").write_bytes(cifrar(crudo, clave))
     crudo_lejos = gzip.compress(json.dumps(lejos, ensure_ascii=False, separators=(",", ":")).encode("utf-8"), 6)

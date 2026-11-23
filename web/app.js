@@ -310,6 +310,7 @@ function pintarEstado() {
     p.classList.add("rojo"); t.textContent = "App cerrada: ábrela desde el escritorio"; btn.disabled = true; return;
   }
   btn.disabled = !!ocupado;
+  btn.classList.toggle("cargando", !!ocupado);      // el icono del botón gira mientras se actualiza
   if (ocupado) {
     p.classList.add("girando"); t.textContent = ESTADO.fase || "Actualizando…"; b.hidden = false; bi.style.width = (ESTADO.progreso || 0) + "%";
   } else if (ESTADO.fase === "Sin internet") {
@@ -476,7 +477,7 @@ function filaPartido(m) {
     return `<span class="ico ${s.nivel}" title="${esc(s.texto)}">${t}</span>`;
   }).join("");
   const top = Array.isArray(p.top?.[0]) ? p.top[0] : p.top;   // predicción nueva: lista; guardada: un marcador
-  return `<div class="partido" data-id="${m.id}">
+  return `<div class="partido" data-id="${m.id}" tabindex="0" role="button" aria-label="${esc(m.h.n)} contra ${esc(m.a.n)}: abrir el análisis">
     <div class="hora">${hora}</div>
     <div class="equipo">${logo(m.h.logo, m.h.n)}<div class="col"><span class="nombre" title="${esc(m.h.n)}">${esc(m.h.n)}</span>${forma(m.ctx?.h?.forma)}</div>${goles("h")}</div>
     <div class="probs">
@@ -515,7 +516,9 @@ function pintarPartidos() {
   cont.innerHTML = orden.map(lg => {
     const l = LIGAS[lg] || { nombre: lg, pais: "" };
     const ms = grupos[lg].sort((a, b) => a.fecha.localeCompare(b.fecha));
-    return `<div class="liga-bloque"><h3 class="liga-titulo">${l.nivel === 1 ? '<span class="estrella">★</span>' : ""}${esc(l.nombre)}<span class="pais">${esc(l.pais)} · ${ms.length} partido${ms.length > 1 ? "s" : ""}</span></h3>${ms.map(filaPartido).join("")}</div>`;
+    // logo oficial de la competición tal como lo publica ESPN; si no hay, queda solo el nombre (no se inventa)
+    const logoLiga = l.logo ? `<img class="liga-logo" src="${esc(l.logo)}" alt="" loading="lazy" onerror="this.remove()">` : "";
+    return `<div class="liga-bloque"><h3 class="liga-titulo">${logoLiga}${l.nivel === 1 ? '<span class="estrella" title="Liga destacada">★</span>' : ""}<span class="liga-nombre">${esc(l.nombre)}</span><span class="pais">${esc(l.pais)} · ${ms.length} partido${ms.length > 1 ? "s" : ""}</span></h3>${ms.map(filaPartido).join("")}</div>`;
   }).join("");
 }
 
@@ -1420,7 +1423,13 @@ function pintarAyuda() {
 // ---------------------------------------------------------------- general
 function pintarTodo() {
   pintarEstado();
-  if (!DATOS) { $("#lista").innerHTML = ""; return; }
+  if (!DATOS) {                      // estado de carga: siluetas en vez de una pantalla vacía
+    const esqueleto = `<div class="esqueleto" role="status" aria-label="Cargando datos">${"<i></i>".repeat(6)}</div>`;
+    $("#lista").innerHTML = esqueleto;
+    if (!$("#v-panel").innerHTML) $("#v-panel").innerHTML = esqueleto;
+    return;
+  }
+  if ($("#v-panel .esqueleto")) $("#v-panel").innerHTML = "";
   pintarFiltroLigas();
   pintarPartidos();
   if (UI.vista === "resultados") pintarResultados();
@@ -1430,9 +1439,19 @@ function pintarTodo() {
   window.PF_vistas?.[UI.vista]?.();      // vistas nuevas (panel.js): panel, comparar, combinada, banca
 }
 
+function cerrarMenu() {            // menú compacto del celular
+  document.querySelector("header").classList.remove("menu-abierto");
+  $("#menu-btn")?.setAttribute("aria-expanded", "false");
+}
 function cambiarVista(v) {
   UI.vista = v;
-  document.querySelectorAll("#nav button").forEach(b => b.classList.toggle("activo", b.dataset.vista === v));
+  document.body.dataset.vista = v;          // el banner solo acompaña a Panel y Partidos (marca.css)
+  document.querySelectorAll("#nav button").forEach(b => {
+    const activo = b.dataset.vista === v;
+    b.classList.toggle("activo", activo);
+    if (activo) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
+  });
+  cerrarMenu();
   document.querySelectorAll(".vista").forEach(s => s.classList.toggle("activa", s.id === "v-" + v));
   pintarTodo();
   if (v === "ayuda") pintarAyuda();
@@ -1448,6 +1467,9 @@ function iniciar() {
   $("#filtro-hist").onchange = e => { UI.ligaHist = e.target.value; pintarResultados(); };
   $("#sel-tabla").onchange = e => { UI.tabla = e.target.value; guardarPref(); pintarTablas(); };
   $("#lista").onclick = e => { const f = e.target.closest(".partido"); if (f) abrirDetalle(f.dataset.id); };
+  // teclado: con Tab se recorre cada partido y con Enter o Espacio se abre su análisis
+  $("#lista").onkeydown = e => { if ((e.key === "Enter" || e.key === " ") && e.target.classList?.contains("partido")) { e.preventDefault(); abrirDetalle(e.target.dataset.id); } };
+  $("#menu-btn").onclick = () => $("#menu-btn").setAttribute("aria-expanded", document.querySelector("header").classList.toggle("menu-abierto"));
   $("#velo").onclick = cerrarDetalle;
   document.addEventListener("keydown", e => { if (e.key === "Escape") cerrarDetalle(); });
   $("#btn-actualizar").onclick = actualizar;

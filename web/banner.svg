@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 300" preserveAspectRatio="xMidYMid slice">
+  <!-- Banner: estadio nocturno ilustrado (dibujo propio, sin texto ni logos). Si algún día se usa una foto,
+       basta con cambiar la imagen de fondo de .banner en marca.css. -->
+  <defs>
+    <linearGradient id="cielo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050A18"/><stop offset=".5" stop-color="#0A1B3F"/><stop offset="1" stop-color="#0D2A52"/></linearGradient>
+    <radialGradient id="foco"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".12" stop-color="#BDF3FF" stop-opacity=".85"/><stop offset=".45" stop-color="#20D8E8" stop-opacity=".22"/><stop offset="1" stop-color="#20D8E8" stop-opacity="0"/></radialGradient>
+    <linearGradient id="haz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C4F4FF" stop-opacity=".42"/><stop offset="1" stop-color="#C4F4FF" stop-opacity="0"/></linearGradient>
+    <linearGradient id="cesped" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14596A"/><stop offset="1" stop-color="#0A2638"/></linearGradient>
+    <linearGradient id="estela" x1="0" x2="1"><stop offset="0" stop-color="#078BFF" stop-opacity="0"/><stop offset=".45" stop-color="#20D8E8" stop-opacity=".9"/><stop offset="1" stop-color="#A879FF" stop-opacity="0"/></linearGradient>
+    <radialGradient id="vineta" cx=".5" cy=".4" r=".8"><stop offset=".6" stop-color="#04070F" stop-opacity="0"/><stop offset="1" stop-color="#04070F" stop-opacity=".8"/></radialGradient>
+    <pattern id="grada" width="12" height="7" patternUnits="userSpaceOnUse"><circle cx="3" cy="2" r="1" fill="#B9D4FF" opacity=".55"/><circle cx="9" cy="5.2" r=".9" fill="#20D8E8" opacity=".4"/></pattern>
+    <pattern id="grada2" width="9" height="6" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#DCE9FF" opacity=".45"/><circle cx="6.5" cy="4.5" r=".7" fill="#A879FF" opacity=".35"/></pattern>
+    <g id="torre">
+      <path d="M-60 0L60 0L360 250L-360 250Z" fill="url(#haz)"/>
+      <circle r="135" fill="url(#foco)"/>
+      <rect x="-50" y="-12" width="100" height="24" rx="5" fill="#0B1428" stroke="#27407A"/>
+      <g fill="#FFFFFF"><circle cx="-36" cy="-4.500" r="3"/><circle cx="-24" cy="-4.500" r="3"/><circle cx="-12" cy="-4.500" r="3"/><circle cy="-4.500" r="3"/><circle cx="12" cy="-4.500" r="3"/><circle cx="24" cy="-4.500" r="3"/><circle cx="36" cy="-4.500" r="3"/>
+        <circle cx="-36" cy="4.500" r="3"/><circle cx="-24" cy="4.500" r="3"/><circle cx="-12" cy="4.500" r="3"/><circle cy="4.500" r="3"/><circle cx="12" cy="4.500" r="3"/><circle cx="24" cy="4.500" r="3"/><circle cx="36" cy="4.500" r="3"/></g>
+    </g>
+  </defs>
+  <rect width="1600" height="300" fill="url(#cielo)"/>
+  <!-- cubierta y dos niveles de grada -->
+  <path d="M0 82C320 38 1280 38 1600 82V104C1280 62 320 62 0 104Z" fill="#0A142B"/>
+  <path d="M0 104C320 62 1280 62 1600 104V152C1280 116 320 116 0 152Z" fill="#12234A"/>
+  <path d="M0 104C320 62 1280 62 1600 104V152C1280 116 320 116 0 152Z" fill="url(#grada)"/>
+  <path d="M0 152C320 116 1280 116 1600 152V158C1280 123 320 123 0 158Z" fill="#1B3468"/>
+  <path d="M0 158C320 123 1280 123 1600 158V184C1280 152 320 152 0 184Z" fill="#152850"/>
+  <path d="M0 158C320 123 1280 123 1600 158V184C1280 152 320 152 0 184Z" fill="url(#grada2)"/>
+  <!-- vallas (sin texto) -->
+  <path d="M0 184C320 152 1280 152 1600 184V191C1280 160 320 160 0 191Z" fill="#078BFF" opacity=".7"/>
+  <!-- césped con franjas y líneas -->
+  <path d="M0 191C320 160 1280 160 1600 191V300H0Z" fill="url(#cesped)"/>
+  <g fill="#051420" opacity=".3">
+    <path d="M150 176L310 168L205 300H-20Z"/><path d="M470 163L630 160L598 300H400Z"/><path d="M800 159L960 161L1015 300H815Z"/><path d="M1130 165L1290 172L1425 300H1222Z"/>
+  </g>
+  <g fill="none" stroke="#E2F8FF" stroke-opacity=".38" stroke-width="2">
+    <path d="M800 160V300"/><ellipse cx="800" cy="236" rx="160" ry="36"/>
+    <path d="M0 240L190 214C250 210 270 240 242 268L175 300"/><path d="M1600 240L1410 214C1350 210 1330 240 1358 268L1425 300"/>
+  </g>
+  <circle cx="800" cy="236" r="3.500" fill="#E2F8FF" opacity=".6"/>
+  <!-- torres de focos -->
+  <use href="#torre" x="175" y="52"/><use href="#torre" x="545" y="32"/><use href="#torre" x="1055" y="32"/><use href="#torre" x="1425" y="52"/>
+  <!-- estelas de luz -->
+  <path d="M-40 262C380 176 880 290 1640 168" fill="none" stroke="url(#estela)" stroke-width="3"/>
+  <path d="M-40 282C460 218 980 296 1640 204" fill="none" stroke="url(#estela)" stroke-width="1.500" opacity=".7"/>
+  <rect width="1600" height="300" fill="url(#vineta)"/>
+</svg>

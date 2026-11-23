@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 330 64" role="img" aria-label="Predicciones Fútbol, por Rodas">
+  <!-- Versión horizontal para fondo oscuro. Para fondo claro: cambiar #EDF4FF por #070D1A y #9EACC8 por #4A5876. -->
+  <defs>
+    <linearGradient id="g" x1="8" y1="8" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#078BFF"/><stop offset="1" stop-color="#20D8E8"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(5.6 0) skewX(-10)">
+    <path fill="url(#g)" fill-rule="evenodd" d="M15 10H37.5C46.6 10 52 15.2 52 23.2C52 30 48.4 34.5 42.6 36.3L52.5 54H40.6L32 37.8H26V54H15ZM26 19.4V28.6H36.6C40 28.6 41.7 26.8 41.7 24C41.7 21.2 40 19.4 36.6 19.4Z"/>
+    <path fill="#20D8E8" opacity=".9" d="M5 44H11.5L9.4 54H2.9Z"/>
+  </g>
+  <text x="72" y="33" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="24" font-weight="800" font-style="italic" fill="#EDF4FF">Predicciones <tspan fill="#20D8E8">Fútbol</tspan></text>
+  <text x="73" y="51" font-family="'Segoe UI', system-ui, Arial, sans-serif" font-size="11.5" font-weight="600" letter-spacing="2.2" fill="#9EACC8">POR RODAS · ANÁLISIS DE FÚTBOL</text>
+</svg>

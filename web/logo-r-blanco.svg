@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="R de Rodas">
+  <!-- Versión monocromática blanca, para fondos pequeños u oscuros. Fondo transparente. -->
+  <g transform="translate(5.6 0) skewX(-10)" fill="#EDF4FF">
+    <path fill-rule="evenodd" d="M15 10H37.5C46.6 10 52 15.2 52 23.2C52 30 48.4 34.5 42.6 36.3L52.5 54H40.6L32 37.8H26V54H15ZM26 19.4V28.6H36.6C40 28.6 41.7 26.8 41.7 24C41.7 21.2 40 19.4 36.6 19.4Z"/>
+    <path d="M5 44H11.5L9.4 54H2.9Z"/>
+  </g>
+</svg>

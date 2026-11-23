@@ -342,6 +342,46 @@ class PaqueteWeb(unittest.TestCase):
         self.assertEqual(len(d["alineacion"]["h"]["jugadores"]), 11)
 
 
+class Marca(unittest.TestCase):
+    """El rediseño (identidad R de Rodas) no puede quitar secciones ni romper lo que la página necesita."""
+    WEB = BASE / "web"
+
+    def setUp(self):
+        self.html = (self.WEB / "index.html").read_text(encoding="utf-8")
+
+    def test_siguen_todas_las_secciones_y_controles(self):
+        for v in ("panel", "partidos", "comparar", "combinada", "banca", "auditoria", "resultados", "tablas", "modelo", "ayuda"):
+            self.assertIn(f'data-vista="{v}"', self.html, v)
+            self.assertIn(f'id="v-{v}"', self.html, v)
+        for i in ("dias", "buscar", "filtro-liga", "solo-dest", "perfil", "lista", "btn-actualizar", "estado-txt",
+                  "filtro-hist", "sel-tabla", "nav", "menu-btn", "detalle", "velo", "toast", "avisos"):
+            self.assertIn(f'id="{i}"', self.html, i)
+
+    def test_recursos_de_la_marca(self):
+        import xml.dom.minidom
+        for n in ("logo-r.svg", "logo-r-blanco.svg", "logo-horizontal.svg", "favicon.svg", "banner.svg"):
+            xml.dom.minidom.parse(str(self.WEB / n))                # SVG bien formado
+        for n in ("marca.css", "icono.png"):
+            self.assertTrue((self.WEB / n).exists(), n)
+        self.assertTrue((BASE / "icono.ico").exists())
+        xml.dom.minidom.parseString(self.html.split("<body", 1)[1].split("<header>", 1)[0].split(">", 1)[1])   # iconos
+
+    def test_la_pagina_web_se_puede_armar(self):
+        # publicar_web.py busca estas etiquetas exactas para ponerles la versión
+        for s in ("<head>", '<script src="app.js"></script>', '<script src="panel.js"></script>',
+                  '<script src="auditoria.js"></script>', 'href="estilos.css"', 'href="marca.css"'):
+            self.assertIn(s, self.html, s)
+        fuente = (BASE / "publicar_web.py").read_text(encoding="utf-8")
+        for s in ("panel.js", "auditoria.js", "estilos.css", "marca.css"):
+            self.assertIn(s, fuente, s)
+
+    def test_no_promete_ganancias(self):
+        texto = self.html.lower()
+        self.assertIn("ningún modelo garantiza ganancias", texto)
+        for prohibido in ("gana seguro", "ganancia segura", "dinero fácil", "garantizado"):
+            self.assertNotIn(prohibido, texto)
+
+
 class DatosReales(unittest.TestCase):
     """Control de calidad sobre lo que la app va a mostrar."""
 

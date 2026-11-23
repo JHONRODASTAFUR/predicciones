@@ -7,6 +7,24 @@ Se actualiza: solo, con la tarea de Windows "PrediccionesFutbol":
               Si no hay internet, muestra lo último guardado y avisa.
 No necesita:  a Claude, cuentas ni claves.
 
+IDENTIDAD «R DE RODAS» (rediseño visual del 23/11/2026)
+  Solo cambia la presentación: no se tocó ningún cálculo, probabilidad ni función.
+  - Marca: monograma R original (inclinado, azul eléctrico a turquesa). Archivos en web\:
+      logo-r.svg (isotipo cuadrado), logo-r-blanco.svg (una tinta), logo-horizontal.svg, favicon.svg,
+      icono.png e icono.ico (los genera crear_icono.py).
+  - Paleta: fondo #070D1A, superficies #101B31, azul eléctrico #078BFF, turquesa #20D8E8, violeta #A879FF,
+    texto #EDF4FF, secundario #9EACC8, en vivo #FF637D. Todo está en web\marca.css.
+  - Cabecera con el logo, navegación con iconos y estado de actualización; en el celular, menú compacto.
+  - Banner de estadio nocturno (web\banner.svg): es un dibujo propio, no una foto. Para usar una foto, cambia
+    la imagen de fondo de «.banner» en web\marca.css.
+  - Filtros agrupados en una barra; en el celular las fechas van en una fila que se desliza.
+  - Tarjetas de partido: se resalta la apuesta del tipo elegido y las otras dos quedan en segundo plano.
+  - Logos de las ligas: los publica ESPN (misma fuente que los escudos). Las ligas sin logo quedan con su nombre.
+  - Accesibilidad: foco visible, navegación con teclado (Tab y Enter abren un partido), respeta «menos
+    movimiento» del sistema. Estados de carga con siluetas.
+  - Para volver al aspecto anterior: quita la línea de marca.css en web\index.html, o
+    git checkout antes-rediseno-2026-11-23
+
 VERSIÓN 3.1 · AUDITORÍA (desde el 22/11/2026)
   Se auditó el programa con 1 398 partidos ya jugados (predicción guardada antes de cada uno) y con 23 340
   partidos predichos sin mirar el futuro. Qué cambió:

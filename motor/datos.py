@@ -305,7 +305,9 @@ def descubrir_ligas():
     from .config import ARCHIVO_LIGAS_ESPN
     try:
         previo = json.loads(ARCHIVO_LIGAS_ESPN.read_text(encoding="utf-8"))
-        if (dt.date.today() - dt.date.fromisoformat(previo["fecha"])).days < 7:
+        # «logo» se añadió en la versión 3.2: si el archivo guardado es anterior, se vuelve a descargar
+        if (dt.date.today() - dt.date.fromisoformat(previo["fecha"])).days < 7 and \
+                any("logo" in x for x in previo["ligas"]):
             return previo["ligas"]
     except Exception:
         pass
@@ -316,7 +318,13 @@ def descubrir_ligas():
         if not slug or any(x in (slug + " " + nombre).lower() for x in _EXCLUIR):
             continue
         tipo = "liga" if re.fullmatch(r"[a-z]{3}\.\d", slug) else "copa"
-        ligas.append({"codigo": slug, "nombre": nombre, "pais": _PAISES_ES.get(slug.split(".")[0], ""), "tipo": tipo})
+        # logo oficial de la competición tal como lo publica ESPN (se prefiere la variante para fondo oscuro)
+        logos = l.get("logos") or []
+        oscuro = next((x.get("href") for x in logos
+                       if "dark" in (x.get("rel") or []) or "-dark/" in (x.get("href") or "")), None)
+        logo = oscuro or (logos[0].get("href") if logos else "") or ""
+        ligas.append({"codigo": slug, "nombre": nombre, "pais": _PAISES_ES.get(slug.split(".")[0], ""), "tipo": tipo,
+                      "logo": logo})
     from .config import ARCHIVO_LIGAS_ESPN as ruta
     ruta.write_text(json.dumps({"fecha": dt.date.today().isoformat(), "ligas": ligas}, ensure_ascii=False),
                     encoding="utf-8")
